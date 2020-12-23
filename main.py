@@ -105,7 +105,9 @@ class ObjectStream:
                 signature = tcode
             fields.append({'name': fname, 'sinnature': signature})
             print(f"name {fname} sinnature {signature}")
-        self.fieldStack.append(fields)
+        lastFieldStack = self.fieldStack.pop()
+        lastFieldStack.append(fields)
+        self.fieldStack.append(lastFieldStack)
 
     def readClassAnnotations(self):
         """
@@ -132,6 +134,7 @@ class ObjectStream:
 
     def readObject(self):
         tc = self.bin.readByte()
+        self.fieldStack.append([])
         if tc != Constants.TC_OBJECT:
             print("InternalError")
             return
@@ -153,8 +156,9 @@ class ObjectStream:
         读取对象的值，先读取父类的值，再读取子类的值
         :return:
         """
-        while len(self.fieldStack):
-            field = self.fieldStack.pop()
+        fieldStack = self.fieldStack.pop()
+        while len(fieldStack):
+            field = fieldStack.pop()
             print(field)
 
     def readHandle(self):
@@ -165,7 +169,7 @@ class ObjectStream:
         handle = self.bin.readInt()
         # handle = handle-Constants.baseWireHandle
         print(hex(handle))
-        return handle
+        return hex(handle)
 
     def readTypeString(self):
         tc = self.bin.readByte()
