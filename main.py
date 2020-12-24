@@ -263,7 +263,9 @@ class ObjectStream:
             return self.readHandle()
         elif tc == Constants.TC_CLASS:
             self.bin.readByte()
-            return self.readClassDescriptor()
+            clazz = self.readClassDescriptor()
+            self.newHandles(clazz)
+            return clazz
         elif tc == Constants.TC_CLASSDESC or tc == Constants.TC_PROXYCLASSDESC:
             return self.readClassDescriptor()
         elif tc == Constants.TC_STRING or tc == Constants.TC_LONGSTRING:
@@ -324,11 +326,12 @@ class ObjectStream:
         array = []
         print(hex(self.newHandles(array)))
         for i in range(size):
-            obj = self.readContent()
-            if obj != 'end':
-                array.append(obj)
-            else:
-                break
+            signature = javaClass.name[1:]
+            if signature.startswith("L") or signature.startswith("["):
+                obj = self.readContent()
+            elif signature == 'B':
+                obj = self.bin.readByte()
+            array.append(obj)
         return array
 
 
@@ -426,7 +429,7 @@ class MyEncoder(json.JSONEncoder):
 
 
 if __name__ == '__main__':
-    f = open("payload.ser", "rb")
+    f = open("worm.out", "rb")
     s = ObjectIO(f)
     obj = ObjectStream(s).readContent()
     print(obj)
