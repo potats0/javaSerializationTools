@@ -426,7 +426,7 @@ class MyEncoder(json.JSONEncoder):
 
 
 if __name__ == '__main__':
-    f = open("payload.out", "rb")
+    f = open("payload.ser", "rb")
     s = ObjectIO(f)
     obj = ObjectStream(s).readContent()
     print(obj)
