@@ -66,7 +66,6 @@ class ObjectIO:
 class ObjectStream:
     def __init__(self, stream):
         self.bin = stream
-        self.fieldStack = []
         self.handles = []
         self.readStreamHeader()
 
@@ -128,10 +127,6 @@ class ObjectStream:
                 signature = tcode.decode()
             fields.append({'name': fname, 'sinnature': signature})
             print(f"name {fname} sinnature {signature}")
-        if self.fieldStack and fields:
-            lastFieldStack = self.fieldStack.pop()
-            lastFieldStack.append(fields)
-            self.fieldStack.append(lastFieldStack)
             classDesc.fields = fields
         return classDesc
 
@@ -163,7 +158,6 @@ class ObjectStream:
 
     def readObject(self):
         tc = self.bin.readByte()
-        self.fieldStack.append([])
         if tc != Constants.TC_OBJECT:
             print("InternalError")
             return
@@ -183,7 +177,6 @@ class ObjectStream:
             javaClass = self.readHandle()
             javaObject = JavaObject(javaClass)
             self.newHandles(javaObject)
-            self.fieldStack.append([javaClass.fields])
             self.readClassData(javaObject)
         elif tc == Constants.TC_PROXYCLASSDESC:
             pass
@@ -197,9 +190,16 @@ class ObjectStream:
         读取对象的值，先读取父类的值，再读取子类的值
         :return:
         """
-        fieldStack = self.fieldStack.pop()
-        while len(fieldStack):
-            fields = fieldStack.pop()
+        superClass = javaObject.javaClass
+        superClassList = []
+        while superClass:
+            superClassList.append(superClass)
+            superClass = superClass.superJavaClass
+
+        while superClassList:
+            classDesc = superClassList.pop()
+            # fields = fieldStack.pop()
+            fields = classDesc.fields
             currentField = []
             for field in fields:
                 singature = field['sinnature']
@@ -211,12 +211,13 @@ class ObjectStream:
                     value = self.bin.readFloat()
                 elif singature == "Z":
                     value = self.bin.readBoolean()
+                else:
+                    print(f"unsupport singatyre{singature}")
                 print(f"name {field['name']}  value {value}")
                 currentField.append({field['name']: [value, field['sinnature']]})
             javaObject.fields.put(currentField)
-
-        if javaObject.javaClass.hasWriteObjectData:
-            self.readObjectAnnotations(javaObject)
+            if classDesc.hasWriteObjectData:
+                self.readObjectAnnotations(javaObject)
 
     def readHandle(self):
         """
@@ -241,7 +242,7 @@ class ObjectStream:
     def readTypeString(self):
         tc = self.bin.peekByte()
         if tc == Constants.TC_NULL:
-            pass
+            return self.readNull()
         elif tc == Constants.TC_REFERENCE:
             return self.readHandle()
         elif tc == Constants.TC_STRING:
@@ -262,6 +263,8 @@ class ObjectStream:
         if tc == Constants.TC_NULL:
             return self.readNull()
         elif tc == Constants.TC_REFERENCE:
+            # self.bin.readByte()
+            # handle = self.bin.readInt()
             return self.readHandle()
         elif tc == Constants.TC_CLASS:
             self.bin.readByte()
@@ -273,19 +276,19 @@ class ObjectStream:
         elif tc == Constants.TC_STRING or tc == Constants.TC_LONGSTRING:
             return self.readTypeString()
         elif tc == Constants.TC_ENUM:
-            pass
+            exit(-3)
         elif tc == Constants.TC_OBJECT:
             return self.readObject()
         elif tc == Constants.TC_EXCEPTION:
-            pass
+            exit(-3)
         elif tc == Constants.TC_ARRAY:
             return self.readArray()
         elif tc == Constants.TC_BLOCKDATA:
             return self.readBlockData()
         elif tc == Constants.TC_BLOCKDATALONG:
-            pass
+            exit(-3)
         elif tc == Constants.TC_ENDBLOCKDATA:
-            print("end")
+            print("------TC_ENDBLOCKDATA")
             self.bin.readByte()
             return 'end'
         else:
@@ -333,6 +336,8 @@ class ObjectStream:
                 obj = self.readContent()
             elif signature == 'B':
                 obj = self.bin.readByte()
+            else:
+                print(print(f"unsupport singatyre{signature}"))
             array.append(obj)
         return array
 
@@ -367,7 +372,7 @@ class JavaObject:
         self.javaClass = javaClass
         # fields 保存类的字段，队列数据结构。父类在最前，子类在最后
         self.fields = Queue()
-        self.objectAnnotation = []
+        self.objectAnnotation = ["NULL"]
 
     def __str__(self):
         return f"className {self.javaClass.name}\t extend {self.javaClass.superJavaClass}"
@@ -387,15 +392,15 @@ def javaClass2Yaml(javaClass):
 
 
 def javaObject2Yaml(javaObject):
-    d = OrderedDict()
-    d['suid'] = javaObject.javaClass.suid
-    d['flags'] = javaObject.javaClass.flags
-    d['classAnnotation'] = None
-    # TODO classAnnotation
-    if javaObject.javaClass.superJavaClass:
-        d['superClass'] = javaClass2Yaml(javaObject.javaClass.superJavaClass)
-    else:
-        d['superClass'] = None
+    d = javaClass2Yaml(javaObject.javaClass)
+    # d['suid'] = javaObject.javaClass.suid
+    # d['flags'] = javaObject.javaClass.flags
+    # d['classAnnotation'] = None
+    # # TODO classAnnotation
+    # if javaObject.javaClass.superJavaClass:
+    #     d['superClass'] = javaClass2Yaml(javaObject.javaClass.superJavaClass)
+    # else:
+    #     d['superClass'] = None
     superClassList = []
     superClass = javaObject.javaClass
     while True:
@@ -404,7 +409,6 @@ def javaObject2Yaml(javaObject):
             superClass = superClass.superJavaClass
         else:
             break
-    print(superClassList)
     allValues = []
     while javaObject.fields.qsize():
         currentObjFields = javaObject.fields.get()
@@ -437,17 +441,17 @@ def javaObject2Yaml(javaObject):
                     data['value'] = v[0]
                 value.append({'data': data})
 
-    d['Fields'] = allValues
+    d[javaObject.javaClass.name]['Fields'] = allValues
     objectAnnotation = []
     for o in javaObject.objectAnnotation:
         if isinstance(o, JavaObject):
             o = javaObject2Yaml(o)
         objectAnnotation.append(o)
     if objectAnnotation:
-        d['objectAnnotation'] = objectAnnotation
+        d[javaObject.javaClass.name]['objectAnnotation'] = objectAnnotation
     else:
-        d['objectAnnotation'] = None
-    return {javaObject.javaClass.name: d}
+        d[javaObject.javaClass.name]['objectAnnotation'] = None
+    return d
 
 
 class MyEncoder(json.JSONEncoder):
@@ -458,7 +462,7 @@ class MyEncoder(json.JSONEncoder):
 
 
 if __name__ == '__main__':
-    f = open("dns.ser", "rb")
+    f = open("worm.out", "rb")
     s = ObjectIO(f)
     obj = ObjectStream(s).readContent()
     print(obj)
@@ -471,3 +475,8 @@ if __name__ == '__main__':
 
     f = open('dns.yaml', 'w+')
     yaml.dump(d, f, allow_unicode=True)
+
+    # TODO:
+    # 1. 已解决，父类ObjectANnotation但是子类没有，导致少一个字节的问题
+    #
+    # 2. 对象互相引用，打印问题，导致过早输出所有值，例父子类互相引用
