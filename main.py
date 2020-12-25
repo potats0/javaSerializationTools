@@ -2,6 +2,8 @@ import json
 from queue import Queue
 from struct import *
 
+from collections import OrderedDict
+
 from Constants import Constants
 
 
@@ -372,8 +374,10 @@ class JavaObject:
 
 
 def javaClass2Yaml(javaClass):
-    d = {'suid': javaClass.suid, 'flags': javaClass.flags,
-         'classAnnotation': None}
+    d = OrderedDict()
+    d['suid'] = javaClass.suid
+    d['flags'] = javaClass.flags
+    d['classAnnotation'] = None
     # TODO classAnnotation
     if javaClass.superJavaClass:
         d['superClass'] = javaClass2Yaml(javaClass.superJavaClass)
@@ -383,32 +387,57 @@ def javaClass2Yaml(javaClass):
 
 
 def javaObject2Yaml(javaObject):
-    d = {'suid': javaObject.javaClass.suid, 'flags': javaObject.javaClass.flags,
-         'classAnnotation': None}
+    d = OrderedDict()
+    d['suid'] = javaObject.javaClass.suid
+    d['flags'] = javaObject.javaClass.flags
+    d['classAnnotation'] = None
     # TODO classAnnotation
     if javaObject.javaClass.superJavaClass:
         d['superClass'] = javaClass2Yaml(javaObject.javaClass.superJavaClass)
     else:
         d['superClass'] = None
-    fields = []
+    superClassList = []
+    superClass = javaObject.javaClass
+    while True:
+        if superClass:
+            superClassList.append(superClass.name)
+            superClass = superClass.superJavaClass
+        else:
+            break
+    print(superClassList)
+    allValues = []
     while javaObject.fields.qsize():
         currentObjFields = javaObject.fields.get()
+        className = superClassList.pop()
+        value = []
+        values = {className: value}
+        allValues.append(values)
         for currentObjField in currentObjFields:
             for k, v in currentObjField.items():
                 data = {'type': v[1], 'fieldName': k}
                 if isinstance(v[0], JavaObject):
                     data['value'] = javaObject2Yaml(v[0])
+                elif isinstance(v[0], JavaClass):
+                    data['value'] = javaClass2Yaml(v[0])
                 elif isinstance(v[0], list):
                     valueList = []
+                    if all([isinstance(i, bytes) for i in v[0]]):
+                        data['value'] = b"".join(v[0])
                     for o in v[0]:
                         if isinstance(o, JavaObject):
                             valueList.append(javaObject2Yaml(o))
+                        elif isinstance(o, JavaClass):
+                            valueList.append(javaClass2Yaml(o))
+                        elif all([isinstance(i, bytes) for i in o]):
+                            valueList.append(b"".join(o))
+                        else:
+                            valueList.append(o)
                     data['value'] = valueList
                 else:
                     data['value'] = v[0]
-                fields.append({'data': data})
+                value.append({'data': data})
 
-    d['Fields'] = fields
+    d['Fields'] = allValues
     objectAnnotation = []
     for o in javaObject.objectAnnotation:
         if isinstance(o, JavaObject):
@@ -429,7 +458,7 @@ class MyEncoder(json.JSONEncoder):
 
 
 if __name__ == '__main__':
-    f = open("worm.out", "rb")
+    f = open("dns.ser", "rb")
     s = ObjectIO(f)
     obj = ObjectStream(s).readContent()
     print(obj)
@@ -438,3 +467,7 @@ if __name__ == '__main__':
     print(d)
     print("------------------------------------")
     print(json.dumps(d, indent=4, cls=MyEncoder, ensure_ascii=False))
+    import yaml
+
+    f = open('dns.yaml', 'w+')
+    yaml.dump(d, f, allow_unicode=True)
