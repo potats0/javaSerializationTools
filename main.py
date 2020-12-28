@@ -171,6 +171,7 @@ class ObjectStream:
         print(f"Super Class start")
         if tc != Constants.TC_NULL:
             superJavaClass = self.readContent()
+            self.newHandles(superJavaClass)
         else:
             self.bin.readByte()
             superJavaClass = None
