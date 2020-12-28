@@ -92,6 +92,27 @@ class ObjectStream:
         javaClass.superJavaClass = superjavaClass
         return javaClass
 
+    def readProxyClassDescriptor(self):
+        """
+        读取动态代理类的结构
+        :return:
+        """
+        tc = self.bin.readByte()
+        if tc != Constants.TC_PROXYCLASSDESC:
+            print("error")
+            return
+        interfaceCount = self.bin.readInt()
+        print(f"Interface count {interfaceCount}")
+        for i in range(interfaceCount):
+            interfaceName = self.bin.readString()
+            print("--------------")
+            print(interfaceName)
+        classDesc = JavaClass("<Dynamic Proxy Class>", 0, 0)
+        self.newHandles(classDesc)
+        self.readClassAnnotations()
+        classDesc.superJavaClass = self.readSuperClassDesc()
+        return classDesc
+
     def __readClassDesc__(self):
         tc = self.bin.readByte()
         if tc != Constants.TC_CLASSDESC:
@@ -179,7 +200,7 @@ class ObjectStream:
             self.newHandles(javaObject)
             self.readClassData(javaObject)
         elif tc == Constants.TC_PROXYCLASSDESC:
-            pass
+            javaObject = self.readProxyClassDescriptor()
         else:
             printInvalidTypeCode(tc)
 
@@ -271,8 +292,10 @@ class ObjectStream:
             clazz = self.readClassDescriptor()
             self.newHandles(clazz)
             return clazz
-        elif tc == Constants.TC_CLASSDESC or tc == Constants.TC_PROXYCLASSDESC:
+        elif tc == Constants.TC_CLASSDESC:
             return self.readClassDescriptor()
+        elif tc == Constants.TC_PROXYCLASSDESC:
+            return self.readProxyClassDescriptor()
         elif tc == Constants.TC_STRING or tc == Constants.TC_LONGSTRING:
             return self.readTypeString()
         elif tc == Constants.TC_ENUM:
@@ -462,7 +485,7 @@ class MyEncoder(json.JSONEncoder):
 
 
 if __name__ == '__main__':
-    f = open("worm.out", "rb")
+    f = open("exp.ser", "rb")
     s = ObjectIO(f)
     obj = ObjectStream(s).readContent()
     print(obj)
