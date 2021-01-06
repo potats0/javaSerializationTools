@@ -34,11 +34,7 @@ class ObjectIO:
 
     def readString(self) -> str:
         length = self.readUnsignedShort()
-        stringBuilder = ""
-        for i in range(length):
-            byte = self.readByte()
-            stringBuilder += byte.decode()
-        return stringBuilder
+        return self.readBytes(length).decode()
 
     def readFloat(self):
         num = self.readBytes(4)
@@ -71,6 +67,7 @@ class ObjectStream:
 
     def newHandles(self, obj):
         self.handles.append(obj)
+        handle = len(self.handles) - 1 + Constants.baseWireHandle
         return len(self.handles) - 1 + Constants.baseWireHandle
 
     def readStreamHeader(self):
@@ -82,14 +79,21 @@ class ObjectStream:
 
     def readClassDescriptor(self):
         """
-        读取非动态代理类的结构，目前还不支持动态代理的类
+        读取非动态代理类的结构
         :return:
         """
-        javaClass = self.__readClassDesc__()
-        # TODO: add classAnnotation to class structs
-        self.readClassAnnotations()
-        superjavaClass = self.readSuperClassDesc()
-        javaClass.superJavaClass = superjavaClass
+        tc = self.bin.peekByte()
+        if tc == Constants.TC_CLASSDESC:
+            javaClass = self.__readClassDesc__()
+            # TODO: add classAnnotation to class structs
+            self.readClassAnnotations()
+            superjavaClass = self.readSuperClassDesc()
+            javaClass.superJavaClass = superjavaClass
+        elif tc == Constants.TC_REFERENCE:
+            javaClass = self.readHandle()
+        else:
+            print("tc unsupport in read class desc")
+            exit(-1)
         return javaClass
 
     def readProxyClassDescriptor(self):
@@ -107,8 +111,9 @@ class ObjectStream:
             interfaceName = self.bin.readString()
             print("--------------")
             print(interfaceName)
-        classDesc = JavaClass("<Dynamic Proxy Class>", 0, 0)
-        self.newHandles(classDesc)
+        classDesc = JavaClass(f"Dynamic Proxy Class {interfaceName}", 0, 0)
+        handle = self.newHandles(classDesc)
+        print(f"TC_PROXYCLASSDESC new handle from {hex(handle)}")
         self.readClassAnnotations()
         classDesc.superJavaClass = self.readSuperClassDesc()
         return classDesc
@@ -137,7 +142,8 @@ class ObjectStream:
         classDesc = JavaClass(className, suid, flags)
         classDesc.hasWriteObjectData = hasWriteObjectData
         classDesc.hasBlockExternalData = hasBlockExternalData
-        self.newHandles(classDesc)
+        handle = self.newHandles(classDesc)
+        print(f"TC_CLASSDESC new handle from {hex(handle)} className {className}")
         fields = []
         for i in range(numFields):
             tcode = self.bin.readByte()
@@ -146,8 +152,8 @@ class ObjectStream:
                 signature = self.readTypeString()
             else:
                 signature = tcode.decode()
-            fields.append({'name': fname, 'sinnature': signature})
-            print(f"name {fname} sinnature {signature}")
+            fields.append({'name': fname, 'signature': signature})
+            print(f"name {fname} signature {signature}")
             classDesc.fields = fields
         return classDesc
 
@@ -155,11 +161,11 @@ class ObjectStream:
         """
         读取类的附加信息
         """
-        tc = self.bin.peekByte()
         print(f"ClassAnnotations start ")
-        while tc != Constants.TC_ENDBLOCKDATA:
-            self.readContent()
-        self.bin.readByte()
+        while True:
+            obj = self.readContent()
+            if obj == 'end':
+                break
         print(f"ClassAnnotations end ")
 
     def readSuperClassDesc(self):
@@ -170,8 +176,10 @@ class ObjectStream:
         tc = self.bin.peekByte()
         print(f"Super Class start")
         if tc != Constants.TC_NULL:
-            superJavaClass = self.readContent()
-            self.newHandles(superJavaClass)
+            superJavaClass = self.readClassDescriptor()
+            # 父子类重复计算handle
+            # handle = self.newHandles(superJavaClass)
+            # print(f"readSuperClassDesc new handle from {hex(handle)}")
         else:
             self.bin.readByte()
             superJavaClass = None
@@ -181,7 +189,7 @@ class ObjectStream:
     def readObject(self):
         tc = self.bin.readByte()
         if tc != Constants.TC_OBJECT:
-            print("InternalError")
+            print("读取object错误，tc不为object！")
             return
         tc = self.bin.peekByte()
         if tc == Constants.TC_CLASSDESC:
@@ -191,17 +199,20 @@ class ObjectStream:
             superjavaClass = self.readSuperClassDesc()
             javaClass.superJavaClass = superjavaClass
             javaObject = JavaObject(javaClass)
-            self.newHandles(javaObject)
+            handle = self.newHandles(javaObject)
+            print(f"readObject new handle from {hex(handle)}")
             self.readClassData(javaObject)
         elif tc == Constants.TC_NULL:
             return self.readNull()
         elif tc == Constants.TC_REFERENCE:
             javaClass = self.readHandle()
             javaObject = JavaObject(javaClass)
-            self.newHandles(javaObject)
+            handle = self.newHandles(javaObject)
+            print(f"readObject new handle from {hex(handle)}")
             self.readClassData(javaObject)
         elif tc == Constants.TC_PROXYCLASSDESC:
             javaObject = self.readProxyClassDescriptor()
+            self.newHandles(javaObject)
         else:
             printInvalidTypeCode(tc)
 
@@ -224,7 +235,7 @@ class ObjectStream:
             fields = classDesc.fields
             currentField = []
             for field in fields:
-                singature = field['sinnature']
+                singature = field['signature']
                 if singature.startswith('L') or singature.startswith('['):
                     value = self.readContent()
                 elif singature == 'I':
@@ -236,7 +247,7 @@ class ObjectStream:
                 else:
                     print(f"unsupport singatyre{singature}")
                 print(f"name {field['name']}  value {value}")
-                currentField.append({field['name']: [value, field['sinnature']]})
+                currentField.append({field['name']: [value, field['signature']]})
             javaObject.fields.put(currentField)
             if classDesc.hasWriteObjectData:
                 self.readObjectAnnotations(javaObject)
@@ -277,7 +288,8 @@ class ObjectStream:
     def readString(self):
         tc = self.bin.readByte()
         string = self.bin.readString()
-        self.newHandles(JavaString(string))
+        handle = self.newHandles(JavaString(string))
+        print(f"readString new handle from {hex(handle)} value {string}")
         return string
 
     def readContent(self):
@@ -285,13 +297,12 @@ class ObjectStream:
         if tc == Constants.TC_NULL:
             return self.readNull()
         elif tc == Constants.TC_REFERENCE:
-            # self.bin.readByte()
-            # handle = self.bin.readInt()
             return self.readHandle()
         elif tc == Constants.TC_CLASS:
             self.bin.readByte()
             clazz = self.readClassDescriptor()
-            self.newHandles(clazz)
+            handle = self.newHandles(clazz)
+            print(f"TC_CLASS new handle from {hex(handle)}")
             return clazz
         elif tc == Constants.TC_CLASSDESC:
             return self.readClassDescriptor()
@@ -353,7 +364,8 @@ class ObjectStream:
         print(javaClass)
         print(f"array size {size}")
         array = []
-        print(hex(self.newHandles(array)))
+        handle = self.newHandles(array)
+        print(f"TC_ARRAY new handle from {hex(handle)}")
         for i in range(size):
             signature = javaClass.name[1:]
             if signature.startswith("L") or signature.startswith("["):
@@ -392,7 +404,6 @@ class JavaString:
 
 class JavaObject:
     def __init__(self, javaClass):
-        # TODO 必须定义父类的字段如何存储，如果都缠在一起，在写入的时候就会没有先后顺序之分
         self.javaClass = javaClass
         # fields 保存类的字段，队列数据结构。父类在最前，子类在最后
         self.fields = Queue()
@@ -486,7 +497,7 @@ class MyEncoder(json.JSONEncoder):
 
 
 if __name__ == '__main__':
-    f = open("exp.ser", "rb")
+    f = open("exploit.ser", "rb")
     s = ObjectIO(f)
     obj = ObjectStream(s).readContent()
     print(obj)
@@ -504,3 +515,9 @@ if __name__ == '__main__':
     # 1. 已解决，父类ObjectANnotation但是子类没有，导致少一个字节的问题
     #
     # 2. 对象互相引用，打印问题，导致过早输出所有值，例父子类互相引用
+    #
+    # 3. 已解决，classANnontion 去掉handle添加
+    #
+    # 4. 已解决，object计算handle问题
+    #
+    # 5. 已解决 父子类计算handle，重复添加
