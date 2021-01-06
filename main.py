@@ -38,7 +38,7 @@ class ObjectIO:
 
     def readFloat(self):
         num = self.readBytes(4)
-        return num
+        return unpack('f', num)[0]
 
     def readBoolean(self):
         tc = int.from_bytes(self.readByte(), 'big')
@@ -497,7 +497,7 @@ class MyEncoder(json.JSONEncoder):
 
 
 if __name__ == '__main__':
-    f = open("exploit.ser", "rb")
+    f = open("dns.ser", "rb")
     s = ObjectIO(f)
     obj = ObjectStream(s).readContent()
     print(obj)
@@ -506,10 +506,10 @@ if __name__ == '__main__':
     print(d)
     print("------------------------------------")
     print(json.dumps(d, indent=4, cls=MyEncoder, ensure_ascii=False))
-    import yaml
-
-    f = open('dns.yaml', 'w+')
-    yaml.dump(d, f, allow_unicode=True)
+    # import yaml
+    #
+    # f = open('dns.yaml', 'w+')
+    # yaml.dump(d, f, allow_unicode=True)
 
     # TODO:
     # 1. 已解决，父类ObjectANnotation但是子类没有，导致少一个字节的问题
