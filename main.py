@@ -242,8 +242,8 @@ class ObjectStream:
             for field in fields:
                 singature = field['signature']
                 value = self.readFieldValue(singature)
-                print(f"name {field['name']}  value {value}")
-                currentField.append({field['name']: [value, field['signature']]})
+                javaField = JavaField(field['name'], singature, value)
+                currentField.append(javaField)
             javaObject.fields.put(currentField)
             if classDesc.hasWriteObjectData:
                 self.readObjectAnnotations(javaObject)
@@ -455,6 +455,13 @@ class JavaObject:
         return f"className {self.javaClass.name}\t extend {self.javaClass.superJavaClass}"
 
 
+class JavaField:
+    def __init__(self, name, singature, value):
+        self.fieldName = name
+        self.singature = singature
+        self.value = value
+
+
 def javaClass2Yaml(javaClass):
     d = OrderedDict()
     d['name'] = javaClass.name
@@ -488,18 +495,7 @@ def javaArray2Yaml(javaArray):
     d['length'] = javaArray.length
     d['values'] = list()
     for o in javaArray.list:
-        if isinstance(o, JavaObject):
-            d['values'].append(javaObject2Yaml(o))
-        elif isinstance(o, JavaClass):
-            d['values'].append(javaClass2Yaml(o))
-        elif isinstance(o, JavaEnum):
-            d['values'].append(javaEnum2Yaml(o))
-        elif isinstance(o, JavaArray):
-            d['values'].append(javaArray2Yaml(o))
-        elif all([isinstance(i, bytes) for i in o]):
-            d['values'].append(b"".join(o))
-        else:
-            d['values'].append(o)
+        d['values'].append(javaContent2Yaml(o))
     return {"Array": d}
 
 
@@ -517,25 +513,15 @@ def javaObject2Yaml(javaObject):
             break
     allValues = []
     while javaObject.fields.qsize():
+        # 从父类开始，一直到子类。数组按顺序排列。类名+值
         currentObjFields = javaObject.fields.get()
         className = superClassList.pop()
         value = []
-        values = {className: value}
-        allValues.append(values)
+        allValues.append({className: value})
         for currentObjField in currentObjFields:
-            for k, v in currentObjField.items():
-                data = {'type': v[1], 'fieldName': k}
-                if isinstance(v[0], JavaObject):
-                    data['value'] = javaObject2Yaml(v[0])
-                elif isinstance(v[0], JavaClass):
-                    data['value'] = javaClass2Yaml(v[0])
-                elif isinstance(v[0], JavaEnum):
-                    data['value'] = javaEnum2Yaml(v[0])
-                elif isinstance(v[0], JavaArray):
-                    data['value'] = javaArray2Yaml(v[0])
-                else:
-                    data['value'] = v[0]
-                value.append({'data': data})
+            data = {'type': currentObjField.singature, 'fieldName': currentObjField.fieldName,
+                    'value': javaContent2Yaml(currentObjField.value)}
+            value.append({'data': data})
 
     d['Values'] = allValues
     objectAnnotation = []
@@ -550,6 +536,21 @@ def javaObject2Yaml(javaObject):
     return d
 
 
+def javaContent2Yaml(java):
+    if isinstance(java, JavaObject):
+        return javaObject2Yaml(java)
+    elif isinstance(java, JavaClass):
+        return javaClass2Yaml(java)
+    elif isinstance(java, JavaEnum):
+        return javaEnum2Yaml(java)
+    elif isinstance(java, JavaArray):
+        return javaArray2Yaml(java)
+    elif isinstance(java, list) and all([isinstance(i, bytes) for i in java]):
+        return b"".join(java)
+    else:
+        return java
+
+
 class MyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, bytes):
@@ -558,13 +559,13 @@ class MyEncoder(json.JSONEncoder):
 
 
 if __name__ == '__main__':
-    with open("tests/jython1.ser", "rb") as f:
+    with open("tests/7u21.ser", "rb") as f:
         obj = ObjectStream(ObjectIO(f)).readContent()
-        d = javaObject2Yaml(obj)
+        d = javaContent2Yaml(obj)
         print("------------------------------------")
         print(d)
         print("------------------------------------")
-        print(json.dumps(d, indent=4, cls=MyEncoder, ensure_ascii=False))
+        print(json.dumps(d, indent=2, cls=MyEncoder, ensure_ascii=False))
         # import yaml
         #
         # f = open('dns.yaml', 'w+')
