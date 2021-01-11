@@ -480,14 +480,14 @@ def javaClass2Yaml(javaClass):
     d['classAnnotations'] = list()
     for i in javaClass.classAnnotations:
         d['classAnnotations'].append(i)
-    return {javaClass.name: d}
+    return {"javaClass": d}
 
 
 def javaEnum2Yaml(javaEnum):
     d = OrderedDict()
     d['classDesc'] = javaClass2Yaml(javaEnum.javaClass)
     d['enumConstantName'] = javaEnum.enumConstantName
-    return {'enum': d}
+    return {'javaenum': d}
 
 
 def javaArray2Yaml(javaArray):
@@ -500,7 +500,7 @@ def javaArray2Yaml(javaArray):
     d['values'] = list()
     for o in javaArray.list:
         d['values'].append(javaContent2Yaml(o))
-    return {"Array": d}
+    return {"javaArray": d}
 
 
 def javaObject2Yaml(javaObject):
@@ -533,7 +533,7 @@ def javaObject2Yaml(javaObject):
         objectAnnotation.append(javaContent2Yaml(o))
     else:
         d['objectAnnotation'] = objectAnnotation
-    return d
+    return {'javaObject': d}
 
 
 def javaString2Yaml(javaString):
