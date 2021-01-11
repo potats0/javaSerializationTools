@@ -258,15 +258,7 @@ class ObjectStream:
         print(hex(handle))
         handle = handle - Constants.baseWireHandle
         obj = self.handles[handle]
-        if isinstance(obj, JavaClass):
-            return obj
-        elif isinstance(obj, JavaString):
-            return obj.string
-        elif isinstance(obj, JavaObject):
-            return obj
-        else:
-            print("unsuppprt type")
-            return None
+        return obj
 
     def readTypeString(self):
         tc = self.bin.peekByte()
