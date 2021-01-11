@@ -166,11 +166,18 @@ class ObjectStream:
             fields.append({'name': fname, 'signature': signature})
             print(f"name {fname} signature {signature}")
             classDesc.fields = fields
+<<<<<<< HEAD
         self.readClassAnnotations()
         classDesc.superJavaClass = self.readSuperClassDesc()
+=======
+
+        self.readClassAnnotations(classDesc)
+        superjavaClass = self.readSuperClassDesc()
+        classDesc.superJavaClass = superjavaClass
+>>>>>>> 5077fed05af3ece8dee005f7d267bf24001ce72a
         return classDesc
 
-    def readClassAnnotations(self):
+    def readClassAnnotations(self, classDesc):
         """
         读取类的附加信息
         """
@@ -179,6 +186,8 @@ class ObjectStream:
             obj = self.readContent()
             if obj == 'end':
                 break
+            else:
+                classDesc.classAnnotations.append(obj)
         print(f"ClassAnnotations end ")
 
     def readSuperClassDesc(self):
@@ -203,7 +212,15 @@ class ObjectStream:
             return
         tc = self.bin.peekByte()
         if tc == Constants.TC_CLASSDESC:
+<<<<<<< HEAD
             javaClass = self.readClassDescriptor()
+=======
+            javaClass = self.__readClassDesc__()
+            javaObject = JavaObject(javaClass)
+            handle = self.newHandles(javaObject)
+            print(f"readObject new handle from {hex(handle)}")
+            self.readClassData(javaObject)
+>>>>>>> 5077fed05af3ece8dee005f7d267bf24001ce72a
         elif tc == Constants.TC_NULL:
             return self.readNull()
         elif tc == Constants.TC_REFERENCE:
@@ -401,9 +418,10 @@ class JavaClass:
         self.flags = flags
         self.superJavaClass = None
         self.fields = []
+        self.classAnnotations = []
 
     def __str__(self):
-        return f"{self.name}"
+        return f"javaclass {self.name}"
 
 
 class JavaString:
@@ -436,7 +454,14 @@ def javaClass2Yaml(javaClass):
         d['superClass'] = javaClass2Yaml(javaClass.superJavaClass)
     else:
         d['superClass'] = None
+<<<<<<< HEAD
     return d
+=======
+    d['classAnnotations'] = list()
+    for i in javaClass.classAnnotations:
+        d['classAnnotations'].append(i)
+    return {javaClass.name: d}
+>>>>>>> 5077fed05af3ece8dee005f7d267bf24001ce72a
 
 
 def javaObject2Yaml(javaObject):
@@ -504,6 +529,7 @@ class MyEncoder(json.JSONEncoder):
 
 
 if __name__ == '__main__':
+<<<<<<< HEAD
     with open("7u21.ser", "rb") as f:
         obj = ObjectStream(ObjectIO(f)).readContent()
         d = javaObject2Yaml(obj)
@@ -526,3 +552,29 @@ if __name__ == '__main__':
         # 4. 已解决，object计算handle问题
         #
         # 5. 已解决 父子类计算handle，重复添加
+=======
+    f = open("worm.out", "rb")
+    s = ObjectIO(f)
+    obj = ObjectStream(s).readContent()
+    print(obj)
+    d = javaObject2Yaml(obj)
+    print("------------------------------------")
+    print(d)
+    print("------------------------------------")
+    print(json.dumps(d, indent=4, cls=MyEncoder, ensure_ascii=False))
+    # import yaml
+    #
+    # f = open('dns.yaml', 'w+')
+    # yaml.dump(d, f, allow_unicode=True)
+
+    # TODO:
+    # 1. 已解决，父类ObjectANnotation但是子类没有，导致少一个字节的问题
+    #
+    # 2. 对象互相引用，打印问题，导致过早输出所有值，例父子类互相引用
+    #
+    # 3. 已解决，classANnontion 去掉handle添加
+    #
+    # 4. 已解决，object计算handle问题
+    #
+    # 5. 已解决 父子类计算handle，重复添加
+>>>>>>> 5077fed05af3ece8dee005f7d267bf24001ce72a
