@@ -26,6 +26,14 @@ class ObjectIO:
         number = self.readBytes(8)
         return int.from_bytes(number, 'big') & 0xFFFFFFFFFFFFFFFF
 
+    def readLong(self) -> int:
+        number = self.readBytes(8)
+        return int.from_bytes(number, 'big')
+
+    def readShort(self) -> int:
+        number = self.readBytes(2)
+        return int.from_bytes(number, 'big')
+
     def readInt(self) -> int:
         return int.from_bytes(self.readBytes(4), 'big')
 
@@ -43,6 +51,14 @@ class ObjectIO:
     def readBoolean(self):
         tc = int.from_bytes(self.readByte(), 'big')
         return True if tc == 0 else False
+
+    def readChar(self):
+        tc = self.readBytes(2)
+        return tc.decode()
+
+    def readDouble(self):
+        tc = self.readBytes(8)
+        return unpack('d', tc)[0]
 
     def writeBytes(self, value):
         self.base_stream.write(value)
@@ -67,7 +83,6 @@ class ObjectStream:
 
     def newHandles(self, obj):
         self.handles.append(obj)
-        handle = len(self.handles) - 1 + Constants.baseWireHandle
         return len(self.handles) - 1 + Constants.baseWireHandle
 
     def readStreamHeader(self):
@@ -85,10 +100,6 @@ class ObjectStream:
         tc = self.bin.peekByte()
         if tc == Constants.TC_CLASSDESC:
             javaClass = self.__readClassDesc__()
-            # TODO: add classAnnotation to class structs
-            self.readClassAnnotations()
-            superjavaClass = self.readSuperClassDesc()
-            javaClass.superJavaClass = superjavaClass
         elif tc == Constants.TC_REFERENCE:
             javaClass = self.readHandle()
         else:
@@ -155,6 +166,8 @@ class ObjectStream:
             fields.append({'name': fname, 'signature': signature})
             print(f"name {fname} signature {signature}")
             classDesc.fields = fields
+        self.readClassAnnotations()
+        classDesc.superJavaClass = self.readSuperClassDesc()
         return classDesc
 
     def readClassAnnotations(self):
@@ -177,9 +190,6 @@ class ObjectStream:
         print(f"Super Class start")
         if tc != Constants.TC_NULL:
             superJavaClass = self.readClassDescriptor()
-            # 父子类重复计算handle
-            # handle = self.newHandles(superJavaClass)
-            # print(f"readSuperClassDesc new handle from {hex(handle)}")
         else:
             self.bin.readByte()
             superJavaClass = None
@@ -193,29 +203,20 @@ class ObjectStream:
             return
         tc = self.bin.peekByte()
         if tc == Constants.TC_CLASSDESC:
-            javaClass = self.__readClassDesc__()
-            # TODO: add classAnnotation to class structs
-            self.readClassAnnotations()
-            superjavaClass = self.readSuperClassDesc()
-            javaClass.superJavaClass = superjavaClass
-            javaObject = JavaObject(javaClass)
-            handle = self.newHandles(javaObject)
-            print(f"readObject new handle from {hex(handle)}")
-            self.readClassData(javaObject)
+            javaClass = self.readClassDescriptor()
         elif tc == Constants.TC_NULL:
             return self.readNull()
         elif tc == Constants.TC_REFERENCE:
             javaClass = self.readHandle()
-            javaObject = JavaObject(javaClass)
-            handle = self.newHandles(javaObject)
-            print(f"readObject new handle from {hex(handle)}")
-            self.readClassData(javaObject)
         elif tc == Constants.TC_PROXYCLASSDESC:
-            javaObject = self.readProxyClassDescriptor()
-            self.newHandles(javaObject)
+            javaClass = self.readProxyClassDescriptor()
         else:
             printInvalidTypeCode(tc)
 
+        javaObject = JavaObject(javaClass)
+        handle = self.newHandles(javaObject)
+        print(f"readObject new handle from {hex(handle)}")
+        self.readClassData(javaObject)
         return javaObject
 
     def readClassData(self, javaObject):
@@ -231,21 +232,11 @@ class ObjectStream:
 
         while superClassList:
             classDesc = superClassList.pop()
-            # fields = fieldStack.pop()
             fields = classDesc.fields
             currentField = []
             for field in fields:
                 singature = field['signature']
-                if singature.startswith('L') or singature.startswith('['):
-                    value = self.readContent()
-                elif singature == 'I':
-                    value = self.bin.readInt()
-                elif singature == 'F':
-                    value = self.bin.readFloat()
-                elif singature == "Z":
-                    value = self.bin.readBoolean()
-                else:
-                    print(f"unsupport singatyre{singature}")
+                value = self.readFieldValue(singature)
                 print(f"name {field['name']}  value {value}")
                 currentField.append({field['name']: [value, field['signature']]})
             javaObject.fields.put(currentField)
@@ -341,7 +332,6 @@ class ObjectStream:
         print("reading readObjectAnnotations")
         while True:
             obj = self.readContent()
-            print(obj)
             if obj == 'end':
                 break
             else:
@@ -368,14 +358,36 @@ class ObjectStream:
         print(f"TC_ARRAY new handle from {hex(handle)}")
         for i in range(size):
             signature = javaClass.name[1:]
-            if signature.startswith("L") or signature.startswith("["):
-                obj = self.readContent()
-            elif signature == 'B':
-                obj = self.bin.readByte()
-            else:
-                print(print(f"unsupport singatyre{signature}"))
+            obj = self.readFieldValue(signature)
             array.append(obj)
         return array
+
+    def readFieldValue(self, singature: str):
+        """
+        读取字段的值，根据字段的类型
+        """
+        if singature.startswith("L") or singature.startswith("["):
+            obj = self.readContent()
+        elif singature == 'B':
+            obj = self.bin.readByte()
+        elif singature == 'C':
+            obj = self.bin.readChar()
+        elif singature == 'D':
+            obj = self.bin.readDouble()
+        elif singature == 'F':
+            obj = self.bin.readFloat()
+        elif singature == 'I':
+            obj = self.bin.readInt()
+        elif singature == 'J':
+            obj = self.bin.readLong()
+        elif singature == 'S':
+            obj = self.bin.readShort()
+        elif singature == "Z":
+            obj = self.bin.readBoolean()
+        else:
+            print(f"unsupport singature  {singature}")
+
+        return obj
 
 
 def printInvalidTypeCode(code: bytes):
@@ -407,7 +419,7 @@ class JavaObject:
         self.javaClass = javaClass
         # fields 保存类的字段，队列数据结构。父类在最前，子类在最后
         self.fields = Queue()
-        self.objectAnnotation = ["NULL"]
+        self.objectAnnotation = []
 
     def __str__(self):
         return f"className {self.javaClass.name}\t extend {self.javaClass.superJavaClass}"
@@ -415,6 +427,7 @@ class JavaObject:
 
 def javaClass2Yaml(javaClass):
     d = OrderedDict()
+    d['name'] = javaClass.name
     d['suid'] = javaClass.suid
     d['flags'] = javaClass.flags
     d['classAnnotation'] = None
@@ -423,19 +436,13 @@ def javaClass2Yaml(javaClass):
         d['superClass'] = javaClass2Yaml(javaClass.superJavaClass)
     else:
         d['superClass'] = None
-    return {javaClass.name: d}
+    return d
 
 
 def javaObject2Yaml(javaObject):
-    d = javaClass2Yaml(javaObject.javaClass)
-    # d['suid'] = javaObject.javaClass.suid
-    # d['flags'] = javaObject.javaClass.flags
-    # d['classAnnotation'] = None
-    # # TODO classAnnotation
-    # if javaObject.javaClass.superJavaClass:
-    #     d['superClass'] = javaClass2Yaml(javaObject.javaClass.superJavaClass)
-    # else:
-    #     d['superClass'] = None
+    d = dict()
+    d['classDesc'] = javaClass2Yaml(javaObject.javaClass)
+    # 打印对象的值，先打印父类得值，再打印子类得值
     superClassList = []
     superClass = javaObject.javaClass
     while True:
@@ -476,16 +483,16 @@ def javaObject2Yaml(javaObject):
                     data['value'] = v[0]
                 value.append({'data': data})
 
-    d[javaObject.javaClass.name]['Fields'] = allValues
+    d['Values'] = allValues
     objectAnnotation = []
     for o in javaObject.objectAnnotation:
         if isinstance(o, JavaObject):
             o = javaObject2Yaml(o)
         objectAnnotation.append(o)
     if objectAnnotation:
-        d[javaObject.javaClass.name]['objectAnnotation'] = objectAnnotation
+        d['objectAnnotation'] = objectAnnotation
     else:
-        d[javaObject.javaClass.name]['objectAnnotation'] = None
+        d['objectAnnotation'] = None
     return d
 
 
@@ -497,27 +504,25 @@ class MyEncoder(json.JSONEncoder):
 
 
 if __name__ == '__main__':
-    f = open("dns.ser", "rb")
-    s = ObjectIO(f)
-    obj = ObjectStream(s).readContent()
-    print(obj)
-    d = javaObject2Yaml(obj)
-    print("------------------------------------")
-    print(d)
-    print("------------------------------------")
-    print(json.dumps(d, indent=4, cls=MyEncoder, ensure_ascii=False))
-    # import yaml
-    #
-    # f = open('dns.yaml', 'w+')
-    # yaml.dump(d, f, allow_unicode=True)
+    with open("7u21.ser", "rb") as f:
+        obj = ObjectStream(ObjectIO(f)).readContent()
+        d = javaObject2Yaml(obj)
+        print("------------------------------------")
+        print(d)
+        print("------------------------------------")
+        print(json.dumps(d, indent=4, cls=MyEncoder, ensure_ascii=False))
+        # import yaml
+        #
+        # f = open('dns.yaml', 'w+')
+        # yaml.dump(d, f, allow_unicode=True)
 
-    # TODO:
-    # 1. 已解决，父类ObjectANnotation但是子类没有，导致少一个字节的问题
-    #
-    # 2. 对象互相引用，打印问题，导致过早输出所有值，例父子类互相引用
-    #
-    # 3. 已解决，classANnontion 去掉handle添加
-    #
-    # 4. 已解决，object计算handle问题
-    #
-    # 5. 已解决 父子类计算handle，重复添加
+        # TODO:
+        # 1. 已解决，父类ObjectANnotation但是子类没有，导致少一个字节的问题
+        #
+        # 2. 对象互相引用，打印问题，导致过早输出所有值，例父子类互相引用
+        #
+        # 3. 已解决，classANnontion 去掉handle添加
+        #
+        # 4. 已解决，object计算handle问题
+        #
+        # 5. 已解决 父子类计算handle，重复添加
