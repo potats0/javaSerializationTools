@@ -119,17 +119,18 @@ class ObjectStream:
             return
         interfaceCount = self.bin.readInt()
         print(f"Interface count {interfaceCount}")
+        interfaces = []
         for i in range(interfaceCount):
             interfaceName = self.bin.readString()
+            interfaces.append(interfaceName)
             print("--------------")
             print(interfaceName)
-        classDesc = JavaClass(f"Dynamic Proxy Class {interfaceName}", 0, 0)
-        handle = self.newHandles(classDesc)
+        javaProxyClass = JavaproxyClass(interfaces)
+        handle = self.newHandles(javaProxyClass)
         print(f"TC_PROXYCLASSDESC new handle from {hex(handle)}")
-        self.readClassAnnotations(classDesc)
-        classDesc.superJavaClass = self.readSuperClassDesc()
-        classDesc.hasWriteObjectData = False
-        return classDesc
+        self.readClassAnnotations(javaProxyClass)
+        javaProxyClass.superJavaClass = self.readSuperClassDesc()
+        return javaProxyClass
 
     def __readClassDesc__(self):
         tc = self.bin.readByte()
@@ -214,7 +215,7 @@ class ObjectStream:
         elif tc == Constants.TC_REFERENCE:
             javaClass = self.readHandle()
         elif tc == Constants.TC_PROXYCLASSDESC:
-            javaClass = self.readProxyClassDescriptor()
+            return self.readProxyClassDescriptor()
         else:
             printInvalidTypeCode(tc)
 
@@ -459,6 +460,13 @@ class JavaClass:
         return f"javaclass {self.name}"
 
 
+class JavaproxyClass:
+    def __init__(self, interfaces):
+        self.interfaces = interfaces
+        self.classAnnotations = []
+        self.superJavaClass = None
+
+
 class JavaException:
     def __init__(self, exception):
         self.exception = exception
@@ -529,7 +537,7 @@ def javaClass2Yaml(javaClass):
 def javaEnum2Yaml(javaEnum):
     d = OrderedDict()
     d['classDesc'] = javaClass2Yaml(javaEnum.javaClass)
-    d['enumConstantName'] = javaEnum.enumConstantName
+    d['enumConstantName'] = javaContent2Yaml(javaEnum.enumConstantName)
     return {'javaenum': d}
 
 
@@ -595,6 +603,18 @@ def javaLongBlockData2Yaml(blockData):
     return {'javaLongBlockData': {"size": blockData.size, 'data': blockData.data}}
 
 
+def JavaproxyClass2Yaml(javaproxyClass):
+    d = dict()
+    d['interfaces'] = []
+    for i in javaproxyClass.interfaces:
+        d['interfaces'].append(i)
+    d['classAnnotations'] = []
+    for i in javaproxyClass.classAnnotations:
+        d['classAnnotations'].append(i)
+    d['superClass'] = javaContent2Yaml(javaproxyClass.superJavaClass)
+    return {'JavaproxyClass': d}
+
+
 def javaContent2Yaml(java):
     if isinstance(java, JavaObject):
         return javaObject2Yaml(java)
@@ -612,6 +632,8 @@ def javaContent2Yaml(java):
         return javaBlockData2Yaml(java)
     elif isinstance(java, JavaLongBLockData):
         return javaLongBlockData2Yaml(java)
+    elif isinstance(java, JavaproxyClass):
+        return JavaproxyClass2Yaml(java)
     elif isinstance(java, list) and all([isinstance(i, bytes) for i in java]):
         return b"".join(java)
     else:
@@ -626,7 +648,7 @@ class MyEncoder(json.JSONEncoder):
 
 
 if __name__ == '__main__':
-    with open("tests/dns.ser", "rb") as f:
+    with open("tests/7u21.ser", "rb") as f:
         obj = ObjectStream(ObjectIO(f)).readContent()
         d = javaContent2Yaml(obj)
         print("------------------------------------")
