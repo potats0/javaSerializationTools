@@ -408,6 +408,14 @@ class ObjectStream:
         tc = self.bin.readByte()
         self.handles = []
 
+    def readException(self):
+        tc = self.bin.readByte()
+        self.handles = []
+        exception = self.readObject()
+        self.handles = []
+        javaException = JavaException(exception)
+        return javaException
+
 
 def printInvalidTypeCode(code: bytes):
     print(f"invalid type code {int.from_bytes(code, 'big'):#2x}")
@@ -424,6 +432,11 @@ class JavaClass:
 
     def __str__(self):
         return f"javaclass {self.name}"
+
+
+class JavaException:
+    def __init__(self, exception):
+        self.exception = exception
 
 
 class JavaArray:
@@ -545,6 +558,10 @@ def javaString2Yaml(javaString):
     return {'javaString': javaString.string}
 
 
+def javaException(javaException):
+    return {'javaException': javaContent2Yaml(javaException.exception)}
+
+
 def javaContent2Yaml(java):
     if isinstance(java, JavaObject):
         return javaObject2Yaml(java)
@@ -556,6 +573,8 @@ def javaContent2Yaml(java):
         return javaArray2Yaml(java)
     elif isinstance(java, JavaString):
         return javaString2Yaml(java)
+    elif isinstance(java, JavaException):
+        return javaException(java)
     elif isinstance(java, list) and all([isinstance(i, bytes) for i in java]):
         return b"".join(java)
     else:
