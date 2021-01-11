@@ -85,10 +85,6 @@ class ObjectStream:
         tc = self.bin.peekByte()
         if tc == Constants.TC_CLASSDESC:
             javaClass = self.__readClassDesc__()
-            # TODO: add classAnnotation to class structs
-            self.readClassAnnotations()
-            superjavaClass = self.readSuperClassDesc()
-            javaClass.superJavaClass = superjavaClass
         elif tc == Constants.TC_REFERENCE:
             javaClass = self.readHandle()
         else:
@@ -155,9 +151,13 @@ class ObjectStream:
             fields.append({'name': fname, 'signature': signature})
             print(f"name {fname} signature {signature}")
             classDesc.fields = fields
+
+        self.readClassAnnotations(classDesc)
+        superjavaClass = self.readSuperClassDesc()
+        classDesc.superJavaClass = superjavaClass
         return classDesc
 
-    def readClassAnnotations(self):
+    def readClassAnnotations(self, classDesc):
         """
         读取类的附加信息
         """
@@ -166,6 +166,8 @@ class ObjectStream:
             obj = self.readContent()
             if obj == 'end':
                 break
+            else:
+                classDesc.classAnnotations.append(obj)
         print(f"ClassAnnotations end ")
 
     def readSuperClassDesc(self):
@@ -194,10 +196,6 @@ class ObjectStream:
         tc = self.bin.peekByte()
         if tc == Constants.TC_CLASSDESC:
             javaClass = self.__readClassDesc__()
-            # TODO: add classAnnotation to class structs
-            self.readClassAnnotations()
-            superjavaClass = self.readSuperClassDesc()
-            javaClass.superJavaClass = superjavaClass
             javaObject = JavaObject(javaClass)
             handle = self.newHandles(javaObject)
             print(f"readObject new handle from {hex(handle)}")
@@ -389,9 +387,10 @@ class JavaClass:
         self.flags = flags
         self.superJavaClass = None
         self.fields = []
+        self.classAnnotations = []
 
     def __str__(self):
-        return f"{self.name}"
+        return f"javaclass {self.name}"
 
 
 class JavaString:
@@ -423,6 +422,9 @@ def javaClass2Yaml(javaClass):
         d['superClass'] = javaClass2Yaml(javaClass.superJavaClass)
     else:
         d['superClass'] = None
+    d['classAnnotations'] = list()
+    for i in javaClass.classAnnotations:
+        d['classAnnotations'].append(i)
     return {javaClass.name: d}
 
 
@@ -497,7 +499,7 @@ class MyEncoder(json.JSONEncoder):
 
 
 if __name__ == '__main__':
-    f = open("dns.ser", "rb")
+    f = open("worm.out", "rb")
     s = ObjectIO(f)
     obj = ObjectStream(s).readContent()
     print(obj)
