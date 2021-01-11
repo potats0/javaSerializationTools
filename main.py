@@ -215,7 +215,7 @@ class ObjectStream:
         elif tc == Constants.TC_REFERENCE:
             javaClass = self.readHandle()
         elif tc == Constants.TC_PROXYCLASSDESC:
-            return self.readProxyClassDescriptor()
+            javaClass = self.readProxyClassDescriptor()
         else:
             printInvalidTypeCode(tc)
 
@@ -465,6 +465,9 @@ class JavaproxyClass:
         self.interfaces = interfaces
         self.classAnnotations = []
         self.superJavaClass = None
+        self.fields = []
+        self.hasWriteObjectData = False
+        self.name = "Dynamic proxy"
 
 
 class JavaException:
@@ -518,20 +521,23 @@ class JavaField:
 
 
 def javaClass2Yaml(javaClass):
-    d = OrderedDict()
-    d['name'] = javaClass.name
-    d['suid'] = javaClass.suid
-    d['flags'] = javaClass.flags
-    d['classAnnotation'] = None
-    # TODO classAnnotation
-    if javaClass.superJavaClass:
-        d['superClass'] = javaClass2Yaml(javaClass.superJavaClass)
+    if isinstance(javaClass, JavaproxyClass):
+        return JavaproxyClass2Yaml(javaClass)
     else:
-        d['superClass'] = None
-    d['classAnnotations'] = list()
-    for i in javaClass.classAnnotations:
-        d['classAnnotations'].append(i)
-    return {"javaClass": d}
+        d = OrderedDict()
+        d['name'] = javaClass.name
+        d['suid'] = javaClass.suid
+        d['flags'] = javaClass.flags
+        d['classAnnotation'] = None
+        # TODO classAnnotation
+        if javaClass.superJavaClass:
+            d['superClass'] = javaClass2Yaml(javaClass.superJavaClass)
+        else:
+            d['superClass'] = None
+        d['classAnnotations'] = list()
+        for i in javaClass.classAnnotations:
+            d['classAnnotations'].append(i)
+        return {"javaClass": d}
 
 
 def javaEnum2Yaml(javaEnum):
@@ -551,6 +557,10 @@ def javaArray2Yaml(javaArray):
     d['values'] = list()
     for o in javaArray.list:
         d['values'].append(javaContent2Yaml(o))
+    else:
+        # 针对xalan payload的bytes表示
+        if all([isinstance(i, bytes) for i in javaArray.list]):
+            d['values'] = b"".join(javaArray.list)
     return {"javaArray": d}
 
 
