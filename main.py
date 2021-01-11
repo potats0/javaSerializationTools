@@ -180,7 +180,7 @@ class ObjectStream:
         print(f"ClassAnnotations start ")
         while True:
             obj = self.readContent()
-            if obj == 'end':
+            if isinstance(obj, JavaEndBlock):
                 break
             else:
                 classDesc.classAnnotations.append(obj)
@@ -320,11 +320,9 @@ class ObjectStream:
         elif tc == Constants.TC_BLOCKDATA:
             return self.readBlockData()
         elif tc == Constants.TC_BLOCKDATALONG:
-            exit(-3)
+            return self.readLongBLockData()
         elif tc == Constants.TC_ENDBLOCKDATA:
-            print("------TC_ENDBLOCKDATA")
-            self.bin.readByte()
-            return 'end'
+            return self.readEndBlock()
         else:
             printInvalidTypeCode(tc)
             exit(-1)
@@ -334,13 +332,19 @@ class ObjectStream:
         length = int.from_bytes(self.bin.readByte(), 'big')
         data = self.bin.readBytes(length)
         print(data)
-        return data
+        blockData = JavaBLockData(length, data)
+        return blockData
+
+    def readEndBlock(self):
+        self.bin.readByte()
+        endBD = JavaEndBlock()
+        return endBD
 
     def readObjectAnnotations(self, javaObject):
         print("reading readObjectAnnotations")
         while True:
             obj = self.readContent()
-            if obj == 'end':
+            if isinstance(obj, JavaEndBlock):
                 break
             else:
                 javaObject.objectAnnotation.append(obj)
@@ -416,9 +420,38 @@ class ObjectStream:
         javaException = JavaException(exception)
         return javaException
 
+    def readLongBLockData(self):
+        tc = self.bin.readByte()
+        length = int.from_bytes(self.bin.readBytes(4), 'big')
+        data = self.bin.readBytes(length)
+        print(data)
+        blockData = JavaLongBLockData(length, data)
+        return blockData
+
 
 def printInvalidTypeCode(code: bytes):
     print(f"invalid type code {int.from_bytes(code, 'big'):#2x}")
+
+
+class JavaEndBlock:
+    pass
+
+
+"""
+两种block的区别在于size的大小，一个为byte，一个为int
+"""
+
+
+class JavaBLockData:
+    def __init__(self, size, data):
+        self.size = size
+        self.data = data
+
+
+class JavaLongBLockData:
+    def __init__(self, size, data):
+        self.size = size
+        self.data = data
 
 
 class JavaClass:
@@ -558,8 +591,16 @@ def javaString2Yaml(javaString):
     return {'javaString': javaString.string}
 
 
-def javaException(javaException):
+def javaException2Yaml(javaException):
     return {'javaException': javaContent2Yaml(javaException.exception)}
+
+
+def javaBlockData2Yaml(blockData):
+    return {'javaBlockData': {"size": blockData.size, 'data': blockData.data}}
+
+
+def javaLongBlockData2Yaml(blockData):
+    return {'javaLongBlockData': {"size": blockData.size, 'data': blockData.data}}
 
 
 def javaContent2Yaml(java):
@@ -574,7 +615,11 @@ def javaContent2Yaml(java):
     elif isinstance(java, JavaString):
         return javaString2Yaml(java)
     elif isinstance(java, JavaException):
-        return javaException(java)
+        return javaException2Yaml(java)
+    elif isinstance(java, JavaBLockData):
+        return javaBlockData2Yaml(java)
+    elif isinstance(java, JavaLongBLockData):
+        return javaLongBlockData2Yaml(java)
     elif isinstance(java, list) and all([isinstance(i, bytes) for i in java]):
         return b"".join(java)
     else:
@@ -589,7 +634,7 @@ class MyEncoder(json.JSONEncoder):
 
 
 if __name__ == '__main__':
-    with open("tests/7u21.ser", "rb") as f:
+    with open("tests/dns.ser", "rb") as f:
         obj = ObjectStream(ObjectIO(f)).readContent()
         d = javaContent2Yaml(obj)
         print("------------------------------------")
