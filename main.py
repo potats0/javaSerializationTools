@@ -284,9 +284,10 @@ class ObjectStream:
     def readString(self):
         tc = self.bin.readByte()
         string = self.bin.readString()
-        handle = self.newHandles(JavaString(string))
+        javaString = JavaString(string)
+        handle = self.newHandles(javaString)
         print(f"readString new handle from {hex(handle)} value {string}")
-        return string
+        return javaString
 
     def readContent(self):
         tc = self.bin.peekByte()
@@ -440,6 +441,9 @@ class JavaString:
     def __init__(self, string):
         self.string = string
 
+    def startswith(self, string):
+        return self.string.startswith(string)
+
     def __str__(self):
         return self.string
 
@@ -519,21 +523,21 @@ def javaObject2Yaml(javaObject):
         value = []
         allValues.append({className: value})
         for currentObjField in currentObjFields:
-            data = {'type': currentObjField.singature, 'fieldName': currentObjField.fieldName,
+            data = {'type': javaContent2Yaml(currentObjField.singature), 'fieldName': currentObjField.fieldName,
                     'value': javaContent2Yaml(currentObjField.value)}
             value.append({'data': data})
 
     d['Values'] = allValues
     objectAnnotation = []
     for o in javaObject.objectAnnotation:
-        if isinstance(o, JavaObject):
-            o = javaObject2Yaml(o)
-        objectAnnotation.append(o)
-    if objectAnnotation:
-        d['objectAnnotation'] = objectAnnotation
+        objectAnnotation.append(javaContent2Yaml(o))
     else:
-        d['objectAnnotation'] = None
+        d['objectAnnotation'] = objectAnnotation
     return d
+
+
+def javaString2Yaml(javaString):
+    return {'javaString': javaString.string}
 
 
 def javaContent2Yaml(java):
@@ -545,6 +549,8 @@ def javaContent2Yaml(java):
         return javaEnum2Yaml(java)
     elif isinstance(java, JavaArray):
         return javaArray2Yaml(java)
+    elif isinstance(java, JavaString):
+        return javaString2Yaml(java)
     elif isinstance(java, list) and all([isinstance(i, bytes) for i in java]):
         return b"".join(java)
     else:
