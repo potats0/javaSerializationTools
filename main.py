@@ -94,7 +94,7 @@ class ObjectStream:
 
     def readClassDescriptor(self):
         """
-        读取非动态代理类的结构
+        读取非动态代理类的结构, 已经将读取到的classdesc添加到handle中
         :return:
         """
         tc = self.bin.peekByte()
@@ -110,6 +110,7 @@ class ObjectStream:
     def readProxyClassDescriptor(self):
         """
         读取动态代理类的结构
+        # TODO: 此处可能有问题，需要进一步检查
         :return:
         """
         tc = self.bin.readByte()
@@ -125,8 +126,9 @@ class ObjectStream:
         classDesc = JavaClass(f"Dynamic Proxy Class {interfaceName}", 0, 0)
         handle = self.newHandles(classDesc)
         print(f"TC_PROXYCLASSDESC new handle from {hex(handle)}")
-        self.readClassAnnotations()
+        self.readClassAnnotations(classDesc)
         classDesc.superJavaClass = self.readSuperClassDesc()
+        classDesc.hasWriteObjectData = False
         return classDesc
 
     def __readClassDesc__(self):
@@ -305,7 +307,7 @@ class ObjectStream:
         elif tc == Constants.TC_STRING or tc == Constants.TC_LONGSTRING:
             return self.readTypeString()
         elif tc == Constants.TC_ENUM:
-            exit(-3)
+            return self.readEnum()
         elif tc == Constants.TC_OBJECT:
             return self.readObject()
         elif tc == Constants.TC_EXCEPTION:
@@ -392,6 +394,15 @@ class ObjectStream:
 
         return obj
 
+    def readEnum(self):
+        tc = self.bin.readByte()
+        javaClass = self.readClassDescriptor()
+        javaEnum = JavaEnum(javaClass)
+        self.newHandles(javaEnum)
+        enumConstantName = self.readContent()
+        javaEnum.enumConstantName = enumConstantName
+        return javaEnum
+
 
 def printInvalidTypeCode(code: bytes):
     print(f"invalid type code {int.from_bytes(code, 'big'):#2x}")
@@ -408,6 +419,12 @@ class JavaClass:
 
     def __str__(self):
         return f"javaclass {self.name}"
+
+
+class JavaEnum:
+    def __init__(self, javaClass):
+        self.javaClass = javaClass
+        self.enumConstantName = None
 
 
 class JavaString:
@@ -446,6 +463,13 @@ def javaClass2Yaml(javaClass):
     return {javaClass.name: d}
 
 
+def javaEnum2Yaml(javaEnum):
+    d = OrderedDict()
+    d['classDesc'] = javaClass2Yaml(javaEnum.javaClass)
+    d['enumConstantName'] = javaEnum.enumConstantName
+    return {'enum': d}
+
+
 def javaObject2Yaml(javaObject):
     d = dict()
     d['classDesc'] = javaClass2Yaml(javaObject.javaClass)
@@ -472,6 +496,8 @@ def javaObject2Yaml(javaObject):
                     data['value'] = javaObject2Yaml(v[0])
                 elif isinstance(v[0], JavaClass):
                     data['value'] = javaClass2Yaml(v[0])
+                elif isinstance(v[0], JavaEnum):
+                    data['value'] = javaEnum2Yaml(v[0])
                 elif isinstance(v[0], list):
                     valueList = []
                     if all([isinstance(i, bytes) for i in v[0]]):
@@ -481,6 +507,8 @@ def javaObject2Yaml(javaObject):
                             valueList.append(javaObject2Yaml(o))
                         elif isinstance(o, JavaClass):
                             valueList.append(javaClass2Yaml(o))
+                        elif isinstance(o, JavaEnum):
+                            valueList.append(javaEnum2Yaml(o))
                         elif all([isinstance(i, bytes) for i in o]):
                             valueList.append(b"".join(o))
                         else:
@@ -511,7 +539,7 @@ class MyEncoder(json.JSONEncoder):
 
 
 if __name__ == '__main__':
-    with open("7u21.ser", "rb") as f:
+    with open("tests/jython1.ser", "rb") as f:
         obj = ObjectStream(ObjectIO(f)).readContent()
         d = javaObject2Yaml(obj)
         print("------------------------------------")
