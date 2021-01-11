@@ -312,7 +312,7 @@ class ObjectStream:
         elif tc == Constants.TC_OBJECT:
             return self.readObject()
         elif tc == Constants.TC_EXCEPTION:
-            exit(-3)
+            return self.readException()
         elif tc == Constants.TC_RESET:
             self.readReset()
         elif tc == Constants.TC_ARRAY:
