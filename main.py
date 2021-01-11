@@ -358,14 +358,13 @@ class ObjectStream:
         size = self.bin.readInt()
         print(javaClass)
         print(f"array size {size}")
-        array = []
-        handle = self.newHandles(array)
+        javaarray = JavaArray(size, javaClass)
+        handle = self.newHandles(javaarray)
         print(f"TC_ARRAY new handle from {hex(handle)}")
         for i in range(size):
             signature = javaClass.name[1:]
-            obj = self.readFieldValue(signature)
-            array.append(obj)
-        return array
+            javaarray.add(self.readFieldValue(signature))
+        return javaarray
 
     def readFieldValue(self, singature: str):
         """
@@ -421,6 +420,16 @@ class JavaClass:
         return f"javaclass {self.name}"
 
 
+class JavaArray:
+    def __init__(self, length, singature):
+        self.singature = singature
+        self.length = length
+        self.list = []
+
+    def add(self, obj):
+        self.list.append(obj)
+
+
 class JavaEnum:
     def __init__(self, javaClass):
         self.javaClass = javaClass
@@ -470,6 +479,30 @@ def javaEnum2Yaml(javaEnum):
     return {'enum': d}
 
 
+def javaArray2Yaml(javaArray):
+    d = OrderedDict()
+    if isinstance(javaArray.singature, JavaClass):
+        d['singature'] = javaClass2Yaml(javaArray.singature)
+    else:
+        d['singature'] = javaArray.javaClass
+    d['length'] = javaArray.length
+    d['values'] = list()
+    for o in javaArray.list:
+        if isinstance(o, JavaObject):
+            d['values'].append(javaObject2Yaml(o))
+        elif isinstance(o, JavaClass):
+            d['values'].append(javaClass2Yaml(o))
+        elif isinstance(o, JavaEnum):
+            d['values'].append(javaEnum2Yaml(o))
+        elif isinstance(o, JavaArray):
+            d['values'].append(javaArray2Yaml(o))
+        elif all([isinstance(i, bytes) for i in o]):
+            d['values'].append(b"".join(o))
+        else:
+            d['values'].append(o)
+    return {"Array": d}
+
+
 def javaObject2Yaml(javaObject):
     d = dict()
     d['classDesc'] = javaClass2Yaml(javaObject.javaClass)
@@ -498,22 +531,8 @@ def javaObject2Yaml(javaObject):
                     data['value'] = javaClass2Yaml(v[0])
                 elif isinstance(v[0], JavaEnum):
                     data['value'] = javaEnum2Yaml(v[0])
-                elif isinstance(v[0], list):
-                    valueList = []
-                    if all([isinstance(i, bytes) for i in v[0]]):
-                        data['value'] = b"".join(v[0])
-                    for o in v[0]:
-                        if isinstance(o, JavaObject):
-                            valueList.append(javaObject2Yaml(o))
-                        elif isinstance(o, JavaClass):
-                            valueList.append(javaClass2Yaml(o))
-                        elif isinstance(o, JavaEnum):
-                            valueList.append(javaEnum2Yaml(o))
-                        elif all([isinstance(i, bytes) for i in o]):
-                            valueList.append(b"".join(o))
-                        else:
-                            valueList.append(o)
-                    data['value'] = valueList
+                elif isinstance(v[0], JavaArray):
+                    data['value'] = javaArray2Yaml(v[0])
                 else:
                     data['value'] = v[0]
                 value.append({'data': data})
