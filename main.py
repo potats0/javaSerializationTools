@@ -313,6 +313,8 @@ class ObjectStream:
             return self.readObject()
         elif tc == Constants.TC_EXCEPTION:
             exit(-3)
+        elif tc == Constants.TC_RESET:
+            self.readReset()
         elif tc == Constants.TC_ARRAY:
             return self.readArray()
         elif tc == Constants.TC_BLOCKDATA:
@@ -401,6 +403,10 @@ class ObjectStream:
         enumConstantName = self.readContent()
         javaEnum.enumConstantName = enumConstantName
         return javaEnum
+
+    def readReset(self):
+        tc = self.bin.readByte()
+        self.handles = []
 
 
 def printInvalidTypeCode(code: bytes):
