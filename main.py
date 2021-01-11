@@ -372,33 +372,32 @@ class ObjectStream:
         读取字段的值，根据字段的类型
         """
         if singature.startswith("L") or singature.startswith("["):
-            obj = self.readContent()
+            return self.readContent()
         elif singature == 'B':
-            obj = self.bin.readByte()
+            return self.bin.readByte()
         elif singature == 'C':
-            obj = self.bin.readChar()
+            return self.bin.readChar()
         elif singature == 'D':
-            obj = self.bin.readDouble()
+            return self.bin.readDouble()
         elif singature == 'F':
-            obj = self.bin.readFloat()
+            return self.bin.readFloat()
         elif singature == 'I':
-            obj = self.bin.readInt()
+            return self.bin.readInt()
         elif singature == 'J':
-            obj = self.bin.readLong()
+            return self.bin.readLong()
         elif singature == 'S':
-            obj = self.bin.readShort()
+            return self.bin.readShort()
         elif singature == "Z":
-            obj = self.bin.readBoolean()
+            return self.bin.readBoolean()
         else:
             print(f"unsupport singature  {singature}")
-
-        return obj
 
     def readEnum(self):
         tc = self.bin.readByte()
         javaClass = self.readClassDescriptor()
         javaEnum = JavaEnum(javaClass)
-        self.newHandles(javaEnum)
+        handle = self.newHandles(javaEnum)
+        print(f"read enum new handle {handle}")
         enumConstantName = self.readContent()
         javaEnum.enumConstantName = enumConstantName
         return javaEnum
