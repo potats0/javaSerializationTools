@@ -12,7 +12,7 @@ class MyEncoder(json.JSONEncoder):
 
 
 if __name__ == '__main__':
-    with open("tests/7u21.ser", "rb") as f:
+    with open("tests/CommonsCollections1.ser", "rb") as f:
         obj = ObjectStream(f).readContent()
         d = javaContent2Yaml(obj)
         print("------------------------------------")
