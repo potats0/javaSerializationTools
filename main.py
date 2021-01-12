@@ -89,8 +89,7 @@ class ObjectStream:
         magic = self.bin.readUnsignedShort()
         version = self.bin.readUnsignedShort()
         if magic != Constants.magic or version != Constants.version:
-            print(f"invalid bin header {magic:#2x} {version:#2x}")
-            exit(-1)
+            raise InvalidHeaderException(magic, version)
 
     def readClassDescriptor(self):
         """
@@ -103,8 +102,7 @@ class ObjectStream:
         elif tc == Constants.TC_REFERENCE:
             javaClass = self.readHandle()
         else:
-            print("tc unsupport in read class desc")
-            exit(-1)
+            raise InvalidTypeCodeException(tc)
         return javaClass
 
     def readProxyClassDescriptor(self):
@@ -115,8 +113,7 @@ class ObjectStream:
         """
         tc = self.bin.readByte()
         if tc != Constants.TC_PROXYCLASSDESC:
-            print("error")
-            return
+            raise InvalidTypeCodeException(tc)
         interfaceCount = self.bin.readInt()
         print(f"Interface count {interfaceCount}")
         interfaces = []
@@ -125,7 +122,7 @@ class ObjectStream:
             interfaces.append(interfaceName)
             print("--------------")
             print(interfaceName)
-        javaProxyClass = JavaproxyClass(interfaces)
+        javaProxyClass = JavaProxyClass(interfaces)
         handle = self.newHandles(javaProxyClass)
         print(f"TC_PROXYCLASSDESC new handle from {hex(handle)}")
         self.readClassAnnotations(javaProxyClass)
@@ -135,8 +132,7 @@ class ObjectStream:
     def __readClassDesc__(self):
         tc = self.bin.readByte()
         if tc != Constants.TC_CLASSDESC:
-            print("InternalError")
-            return
+            raise InvalidTypeCodeException(tc)
         # read Class name from bin
         className = self.bin.readString()
         suid = self.bin.readUnsignedLong()
@@ -205,8 +201,7 @@ class ObjectStream:
     def readObject(self):
         tc = self.bin.readByte()
         if tc != Constants.TC_OBJECT:
-            print("读取object错误，tc不为object！")
-            return
+            raise InvalidTypeCodeException(tc)
         tc = self.bin.peekByte()
         if tc == Constants.TC_CLASSDESC:
             javaClass = self.readClassDescriptor()
@@ -272,7 +267,7 @@ class ObjectStream:
         elif tc == Constants.TC_LONGSTRING:
             return self.readString()
         else:
-            printInvalidTypeCode(tc)
+            raise InvalidTypeCodeException(tc)
 
     def readString(self):
         tc = self.bin.readByte()
@@ -317,8 +312,7 @@ class ObjectStream:
         elif tc == Constants.TC_ENDBLOCKDATA:
             return self.readEndBlock()
         else:
-            printInvalidTypeCode(tc)
-            exit(-1)
+            raise InvalidTypeCodeException(tc)
 
     def readBlockData(self):
         tc = self.bin.readByte()
@@ -423,7 +417,7 @@ class ObjectStream:
 
 
 def printInvalidTypeCode(code: bytes):
-    print(f"invalid type code {int.from_bytes(code, 'big'):#2x}")
+    return f"invalid type code {int.from_bytes(code, 'big'):#2x}"
 
 
 class JavaEndBlock:
@@ -460,7 +454,7 @@ class JavaClass:
         return f"javaclass {self.name}"
 
 
-class JavaproxyClass:
+class JavaProxyClass:
     def __init__(self, interfaces):
         self.interfaces = interfaces
         self.classAnnotations = []
@@ -521,7 +515,7 @@ class JavaField:
 
 
 def javaClass2Yaml(javaClass):
-    if isinstance(javaClass, JavaproxyClass):
+    if isinstance(javaClass, JavaProxyClass):
         return JavaproxyClass2Yaml(javaClass)
     else:
         d = OrderedDict()
@@ -642,7 +636,7 @@ def javaContent2Yaml(java):
         return javaBlockData2Yaml(java)
     elif isinstance(java, JavaLongBLockData):
         return javaLongBlockData2Yaml(java)
-    elif isinstance(java, JavaproxyClass):
+    elif isinstance(java, JavaProxyClass):
         return JavaproxyClass2Yaml(java)
     elif isinstance(java, list) and all([isinstance(i, bytes) for i in java]):
         return b"".join(java)
@@ -655,6 +649,23 @@ class MyEncoder(json.JSONEncoder):
         if isinstance(obj, bytes):
             return obj.hex()
         return json.JSONEncoder.default(self, obj)
+
+
+class InvalidHeaderException(Exception):
+    def __init__(self, magic, version):
+        self.magic = magic
+        self.version = version
+
+    def __str__(self):
+        print(f"invalid bin header {self.magic:#2x} {self.version:#2x}")
+
+
+class InvalidTypeCodeException(Exception):
+    def __init__(self, errorTc):
+        self.tc = errorTc
+
+    def __str__(self):
+        return printInvalidTypeCode(self.tc)
 
 
 if __name__ == '__main__':
