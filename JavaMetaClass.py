@@ -2,7 +2,8 @@ from collections import OrderedDict
 
 
 class JavaEndBlock:
-    pass
+    def __eq__(self, other):
+        return isinstance(other, JavaEndBlock)
 
 
 """
@@ -14,6 +15,11 @@ class JavaBLockData:
     def __init__(self, size, data):
         self.size = size
         self.data = data
+
+    def __eq__(self, other):
+        if not isinstance(other, JavaBLockData):
+            return False
+        return self.size == other.size and self.data == other.data
 
 
 class JavaLongBLockData:
@@ -30,6 +36,11 @@ class JavaClass:
         self.superJavaClass = None
         self.fields = []
         self.classAnnotations = []
+
+    def __eq__(self, other):
+        if not isinstance(other, JavaClass):
+            return False
+        return other.name == self.name
 
     def __str__(self):
         return f"javaclass {self.name}"
@@ -76,6 +87,11 @@ class JavaString:
     def __str__(self):
         return self.string
 
+    def __eq__(self, other):
+        if not isinstance(other, JavaString):
+            return False
+        return other.string == self.string
+
 
 class JavaObject:
     def __init__(self, javaClass):
@@ -87,12 +103,40 @@ class JavaObject:
     def __str__(self):
         return f"className {self.javaClass.name}\t extend {self.javaClass.superJavaClass}"
 
+    def __eq__(self, other):
+        if not isinstance(other, JavaObject):
+            return False
+        if other.javaClass != self.javaClass:
+            return False
+        if len(other.fields) != len(self.fields):
+            return False
+        else:
+            for i in zip(self.fields, other.fields):
+                for j in zip(*i):
+                    if j[0] != j[1]:
+                        return False
+        if len(other.objectAnnotation) != len(self.objectAnnotation):
+            return False
+        else:
+            for i in zip(other.objectAnnotation, self.objectAnnotation):
+                if i[0] != i[1]:
+                    return False
+        return True
+
+
+
+
 
 class JavaField:
     def __init__(self, name, singature, value):
         self.fieldName = name
         self.singature = singature
         self.value = value
+
+    def __eq__(self, other):
+        if not isinstance(other, JavaField):
+            return False
+        return other.singature == self.singature and other.value == self.value and other.fieldName == self.fieldName
 
 
 def javaClass2Yaml(javaClass):
