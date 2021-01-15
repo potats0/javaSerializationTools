@@ -94,35 +94,38 @@ class JavaField:
         self.singature = singature
         self.value = value
 
+
 def javaClass2Yaml(javaClass):
     if isinstance(javaClass, JavaProxyClass):
         return JavaproxyClass2Yaml(javaClass)
     else:
-        d = OrderedDict()
+        d = dict()
         d['name'] = javaClass.name
         d['suid'] = javaClass.suid
         d['flags'] = javaClass.flags
-        d['classAnnotation'] = None
-        # TODO classAnnotation
+        field = []
+        for classfield in javaClass.fields:
+            field.append({"name": classfield['name'], 'singature': javaContent2Yaml(classfield['signature'])})
+        d['fields'] = field
         if javaClass.superJavaClass:
             d['superClass'] = javaClass2Yaml(javaClass.superJavaClass)
         else:
             d['superClass'] = None
         d['classAnnotations'] = list()
         for i in javaClass.classAnnotations:
-            d['classAnnotations'].append(i)
+            d['classAnnotations'].append(javaContent2Yaml(i))
         return {"javaClass": d}
 
 
 def javaEnum2Yaml(javaEnum):
-    d = OrderedDict()
+    d = dict()
     d['classDesc'] = javaClass2Yaml(javaEnum.javaClass)
     d['enumConstantName'] = javaContent2Yaml(javaEnum.enumConstantName)
     return {'javaenum': d}
 
 
 def javaArray2Yaml(javaArray):
-    d = OrderedDict()
+    d = dict()
     if isinstance(javaArray.singature, JavaClass):
         d['singature'] = javaClass2Yaml(javaArray.singature)
     else:
@@ -194,9 +197,13 @@ def JavaproxyClass2Yaml(javaproxyClass):
         d['interfaces'].append(i)
     d['classAnnotations'] = []
     for i in javaproxyClass.classAnnotations:
-        d['classAnnotations'].append(i)
+        d['classAnnotations'].append(javaContent2Yaml(i))
     d['superClass'] = javaContent2Yaml(javaproxyClass.superJavaClass)
     return {'JavaproxyClass': d}
+
+
+def javaEndBLock2Yaml(JavaEndBLock):
+    return {'javaEndBLock': 'javaEndBLock'}
 
 
 def javaContent2Yaml(java):
@@ -218,6 +225,8 @@ def javaContent2Yaml(java):
         return javaLongBlockData2Yaml(java)
     elif isinstance(java, JavaProxyClass):
         return JavaproxyClass2Yaml(java)
+    elif isinstance(java, JavaEndBlock):
+        return javaEndBLock2Yaml(java)
     elif isinstance(java, list) and all([isinstance(i, bytes) for i in java]):
         return b"".join(java)
     else:
