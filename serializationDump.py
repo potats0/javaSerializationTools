@@ -35,6 +35,9 @@ class ObjectIO:
     def readInt(self) -> int:
         return int.from_bytes(self.readBytes(4), 'big')
 
+    def writeInt(self, num):
+        self.writeBytes(num.to_bytes(4, 'big'))
+
     def readBytes(self, length) -> bytes:
         return self.base_stream.read(length)
 
@@ -63,13 +66,20 @@ class ObjectIO:
 
     def writeString(self, value):
         length = len(value)
-        self.pack(str(length) + 's', value)
+        self.writeShort(length)
+        self.writeBytes(value.encode())
 
     def pack(self, fmt, data):
         return self.writeBytes(pack(fmt, data))
 
     def unpack(self, fmt, length=1):
         return unpack(fmt, self.readBytes(length))[0]
+
+    def writeShort(self, num):
+        self.writeBytes(num.to_bytes(2, "big"))
+
+    def writeLong(self, num):
+        self.writeBytes(num.to_bytes(8, "big"))
 
 
 class ObjectStream:
@@ -174,10 +184,10 @@ class ObjectStream:
         print(f"ClassAnnotations start ")
         while True:
             __obj__ = self.readContent()
+            classDesc.classAnnotations.append(__obj__)
             if isinstance(__obj__, JavaEndBlock):
                 break
-            else:
-                classDesc.classAnnotations.append(__obj__)
+
         print(f"ClassAnnotations end ")
 
     def readSuperClassDesc(self):
@@ -210,7 +220,7 @@ class ObjectStream:
         elif tc == Constants.TC_PROXYCLASSDESC:
             javaClass = self.readProxyClassDescriptor()
         else:
-            printInvalidTypeCode(tc)
+            raise InvalidTypeCodeException(tc)
 
         javaObject = JavaObject(javaClass)
         handle = self.newHandles(javaObject)
@@ -328,10 +338,9 @@ class ObjectStream:
         print("reading readObjectAnnotations")
         while True:
             __obj__ = self.readContent()
+            javaObject.objectAnnotation.append(__obj__)
             if isinstance(__obj__, JavaEndBlock):
                 break
-            else:
-                javaObject.objectAnnotation.append(__obj__)
 
     def readNull(self):
         self.bin.readByte()
