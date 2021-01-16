@@ -81,6 +81,9 @@ class ObjectIO:
     def writeLong(self, num):
         self.writeBytes(num.to_bytes(8, "big"))
 
+    def writeFloat(self, value):
+        self.writeBytes(pack('f', value))
+
 
 class ObjectStream:
     def __init__(self, stream):
