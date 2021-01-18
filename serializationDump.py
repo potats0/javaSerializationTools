@@ -84,6 +84,16 @@ class ObjectIO:
     def writeFloat(self, value):
         self.writeBytes(pack('f', value))
 
+    def writeChar(self, value):
+        self.writeBytes(value.encode)
+
+    def writeDouble(self, value):
+        self.writeBytes(pack('d', value))
+
+    def writeBoolean(self, value):
+        value = 0 if value else 1
+        self.writeBytes(value.to_bytes(1, 'big'))
+
 
 class ObjectStream:
     def __init__(self, stream):
