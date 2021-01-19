@@ -22,11 +22,11 @@ class ObjectIO:
 
     def readUnsignedLong(self) -> int:
         number = self.readBytes(8)
-        return int.from_bytes(number, 'big') & 0xFFFFFFFFFFFFFFFF
+        return int.from_bytes(number, 'big', signed=False)
 
     def readLong(self) -> int:
         number = self.readBytes(8)
-        return int.from_bytes(number, 'big')
+        return int.from_bytes(number, 'big', signed=True)
 
     def readShort(self) -> int:
         number = self.readBytes(2)
@@ -155,7 +155,7 @@ class ObjectStream:
             raise InvalidTypeCodeException(tc)
         # read Class name from bin
         className = self.bin.readString()
-        suid = self.bin.readUnsignedLong()
+        suid = self.bin.readLong()
         flags = self.bin.readByte()
         flags = int.from_bytes(flags, 'big')
         numFields = self.bin.readUnsignedShort()
