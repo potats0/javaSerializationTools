@@ -46,6 +46,8 @@ class ObjectWrite:
             self.writeJavaProxyClass(content)
         elif content == 'null':
             self.stream.writeBytes(Constants.TC_NULL)
+        else:
+            print(content)
 
     def writeObject(self, javaObject):
         if javaObject in self.handles:
@@ -54,11 +56,21 @@ class ObjectWrite:
         self.stream.writeBytes(Constants.TC_OBJECT)
         self.writeClassDesc(javaObject.javaClass)
         self.handles.append(javaObject)
+
+        superClassList = []
+        superClass = javaObject.javaClass
+        while True:
+            if superClass:
+                superClassList.append(superClass)
+                superClass = superClass.superJavaClass
+            else:
+                break
         for field in javaObject.fields:
+            classDesc = superClassList.pop()
             for i in field:
                 self.writeContent(i)
-        if javaObject.javaClass.hasWriteObjectData:
-            self.writeObjectAnnotations(javaObject.objectAnnotation)
+            if classDesc.hasWriteObjectData:
+                self.writeObjectAnnotations(javaObject.objectAnnotation)
 
     def writeClassDesc(self, javaClass):
         if javaClass in self.handles:
@@ -130,11 +142,16 @@ class ObjectWrite:
             self.stream.writeShort(content.value)
         elif content.singature == 'Z':
             self.stream.writeBoolean(content.value)
+        else:
+            print("unsupport", content)
 
     def writeObjectAnnotations(self, objectAnnotation):
         # if len(objectAnnotation):
-            for i in objectAnnotation:
+            while len(objectAnnotation):
+                i = objectAnnotation.pop(0)
                 self.writeContent(i)
+                if i == JavaEndBlock:
+                    return
         # else:
         #     self.stream.writeBytes(Constants.TC_ENDBLOCKDATA)
 
@@ -293,10 +310,10 @@ if __name__ == '__main__':
     with open("tests/payload.ser", "rb") as f:
         a = ObjectStream(f)
         obj = a.readContent()
-        obj1 = copy.deepcopy(obj)
-        d = javaContent2Yaml(obj)
+        # obj1 = copy.deepcopy(obj)
+        # d = javaContent2Yaml(obj)
         print("------------------------------------")
-        print(d)
+        # print(d)
         print("------------------------------------")
         # print(json.dumps(d, indent=2, cls=MyEncoder, ensure_ascii=False))
         # payload = json.dumps(d, indent=2, cls=MyEncoder, ensure_ascii=False)
@@ -305,10 +322,10 @@ if __name__ == '__main__':
     print(obj == obj1)
     with open("test.ser", 'wb') as f:
         o = ObjectWrite(f)
-        o.writeContent(obj1)
+        o.writeContent(obj)
         pass
     with open("test.ser", 'rb') as f:
-        obj = ObjectStream(f).readContent()
+        obj1 = ObjectStream(f).readContent()
         # d = javaContent2Yaml(obj)
         print(obj == obj1)
 
