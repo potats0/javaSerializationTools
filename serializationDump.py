@@ -33,10 +33,10 @@ class ObjectIO:
         return int.from_bytes(number, 'big')
 
     def readInt(self) -> int:
-        return int.from_bytes(self.readBytes(4), 'big')
+        return int.from_bytes(self.readBytes(4), 'big', signed=True)
 
     def writeInt(self, num):
-        self.writeBytes(num.to_bytes(4, 'big'))
+        self.writeBytes(num.to_bytes(4, 'big', signed=True))
 
     def readBytes(self, length) -> bytes:
         return self.base_stream.read(length)
@@ -261,9 +261,9 @@ class ObjectStream:
             fields = classDesc.fields
             currentField = []
             for field in fields:
-                singature = field['signature']
-                value = self.readFieldValue(singature)
-                javaField = JavaField(field['name'], singature, value)
+                signature = field['signature']
+                value = self.readFieldValue(signature)
+                javaField = JavaField(field['name'], signature, value)
                 currentField.append(javaField)
             javaObject.fields.append(currentField)
             if classDesc.hasWriteObjectData:
@@ -384,30 +384,30 @@ class ObjectStream:
             javaarray.add(self.readFieldValue(signature))
         return javaarray
 
-    def readFieldValue(self, singature: str):
+    def readFieldValue(self, signature: str):
         """
         读取字段的值，根据字段的类型
         """
-        if singature.startswith("L") or singature.startswith("["):
+        if signature.startswith("L") or signature.startswith("["):
             return self.readContent()
-        elif singature == 'B':
+        elif signature == 'B':
             return self.bin.readByte()
-        elif singature == 'C':
+        elif signature == 'C':
             return self.bin.readChar()
-        elif singature == 'D':
+        elif signature == 'D':
             return self.bin.readDouble()
-        elif singature == 'F':
+        elif signature == 'F':
             return self.bin.readFloat()
-        elif singature == 'I':
+        elif signature == 'I':
             return self.bin.readInt()
-        elif singature == 'J':
+        elif signature == 'J':
             return self.bin.readLong()
-        elif singature == 'S':
+        elif signature == 'S':
             return self.bin.readShort()
-        elif singature == "Z":
+        elif signature == "Z":
             return self.bin.readBoolean()
         else:
-            print(f"unsupport singature  {singature}")
+            print(f"unsupport signature  {signature}")
 
     def readEnum(self):
         self.bin.readByte()

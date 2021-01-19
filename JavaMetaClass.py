@@ -1,3 +1,4 @@
+import copy
 from collections import OrderedDict
 
 
@@ -41,6 +42,7 @@ class JavaClass:
         self.superJavaClass = None
         self.fields = []
         self.classAnnotations = []
+        self.hasWriteObjectData = False
 
     def __eq__(self, other):
         if not isinstance(other, JavaClass):
@@ -80,8 +82,8 @@ class JavaException:
 
 
 class JavaArray:
-    def __init__(self, length, singature):
-        self.singature = singature
+    def __init__(self, length, signature):
+        self.signature = signature
         self.length = length
         self.list = []
 
@@ -162,15 +164,15 @@ class JavaObject:
 
 
 class JavaField:
-    def __init__(self, name, singature, value):
+    def __init__(self, name, signature, value):
         self.fieldName = name
-        self.singature = singature
+        self.signature = signature
         self.value = value
 
     def __eq__(self, other):
         if not isinstance(other, JavaField):
             return False
-        return other.singature == self.singature and other.value == self.value and other.fieldName == self.fieldName
+        return other.signature == self.signature and other.value == self.value and other.fieldName == self.fieldName
 
 
 def javaClass2Yaml(javaClass):
@@ -183,7 +185,7 @@ def javaClass2Yaml(javaClass):
         d['flags'] = javaClass.flags
         field = []
         for classfield in javaClass.fields:
-            field.append({"name": classfield['name'], 'singature': javaContent2Yaml(classfield['signature'])})
+            field.append({"name": classfield['name'], 'signature': javaContent2Yaml(classfield['signature'])})
         d['fields'] = field
         if javaClass.superJavaClass:
             d['superClass'] = javaClass2Yaml(javaClass.superJavaClass)
@@ -204,10 +206,10 @@ def javaEnum2Yaml(javaEnum):
 
 def javaArray2Yaml(javaArray):
     d = dict()
-    if isinstance(javaArray.singature, JavaClass):
-        d['singature'] = javaClass2Yaml(javaArray.singature)
+    if isinstance(javaArray.signature, JavaClass):
+        d['signature'] = javaClass2Yaml(javaArray.signature)
     else:
-        d['singature'] = javaArray.javaClass
+        d['signature'] = javaArray.javaClass
     d['length'] = javaArray.length
     d['values'] = list()
     for o in javaArray.list:
@@ -232,15 +234,20 @@ def javaObject2Yaml(javaObject):
         else:
             break
     allValues = []
-    while len(javaObject.fields):
+    # 如果某个对象中出现两个一摸一样的变量，直接pop的话，则会导致另外一个变量为空
+    backupfields = list(map(list, javaObject.fields))
+    while len(backupfields):
         # 从父类开始，一直到子类。数组按顺序排列。类名+值
-        currentObjFields = javaObject.fields.pop(0)
+        currentObjFields = backupfields.pop(0)
         className = superClassList.pop()
         value = []
         allValues.append({className: value})
         for currentObjField in currentObjFields:
-            data = {'type': javaContent2Yaml(currentObjField.singature), 'fieldName': currentObjField.fieldName,
-                    'value': javaContent2Yaml(currentObjField.value)}
+            data = {'type': javaContent2Yaml(currentObjField.signature), 'fieldName': currentObjField.fieldName}
+            if currentObjField.value == javaObject:
+                data['value'] = "self"
+            else:
+                data['value'] = javaContent2Yaml(currentObjField.value)
             value.append({'data': data})
 
     d['Values'] = allValues

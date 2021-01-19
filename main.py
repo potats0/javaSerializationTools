@@ -55,7 +55,7 @@ class ObjectWrite:
             return
         self.stream.writeBytes(Constants.TC_OBJECT)
         self.writeClassDesc(javaObject.javaClass)
-        self.handles.append(javaObject)
+        self.handles.append(copy.deepcopy(javaObject))
 
         superClassList = []
         superClass = javaObject.javaClass
@@ -65,7 +65,9 @@ class ObjectWrite:
                 superClass = superClass.superJavaClass
             else:
                 break
-        for field in javaObject.fields:
+        # 防止出现引用的时候，之前的对象字段丢失，导致另外一个引用的对象无法判断handle
+        backupFields = copy.deepcopy(javaObject.fields)
+        for field in backupFields:
             classDesc = superClassList.pop()
             for i in field:
                 self.writeContent(i)
@@ -124,36 +126,33 @@ class ObjectWrite:
         self.stream.writeBytes(Constants.TC_ENDBLOCKDATA)
 
     def writeJavaField(self, content):
-        if content.singature.startswith('L') or content.singature.startswith('['):
+        if content.signature.startswith('L') or content.signature.startswith('['):
             self.writeContent(content.value)
-        elif content.singature == "B":
+        elif content.signature == "B":
             self.stream.writeBytes(content.value)
-        elif content.singature == "C":
+        elif content.signature == "C":
             self.stream.writeChar(content.value)
-        elif content.singature == "D":
+        elif content.signature == "D":
             self.stream.writeDouble(content.value)
-        elif content.singature == "F":
+        elif content.signature == "F":
             self.stream.writeFloat(content.value)
-        elif content.singature == 'I':
+        elif content.signature == 'I':
             self.stream.writeInt(content.value)
-        elif content.singature == 'J':
+        elif content.signature == 'J':
             self.stream.writeLong(content.value)
-        elif content.singature == 'S':
+        elif content.signature == 'S':
             self.stream.writeShort(content.value)
-        elif content.singature == 'Z':
+        elif content.signature == 'Z':
             self.stream.writeBoolean(content.value)
         else:
             print("unsupport", content)
 
     def writeObjectAnnotations(self, objectAnnotation):
-        # if len(objectAnnotation):
-            while len(objectAnnotation):
-                i = objectAnnotation.pop(0)
-                self.writeContent(i)
-                if i == JavaEndBlock:
-                    return
-        # else:
-        #     self.stream.writeBytes(Constants.TC_ENDBLOCKDATA)
+        while len(objectAnnotation):
+            i = objectAnnotation.pop(0)
+            self.writeContent(i)
+            if i == JavaEndBlock:
+                return
 
     def writeJavaBlockData(self, content):
         self.stream.writeBytes(Constants.TC_BLOCKDATA)
@@ -165,14 +164,14 @@ class ObjectWrite:
             return self.writeHandle(content)
         else:
             self.stream.writeBytes(Constants.TC_ARRAY)
-            self.writeClassDesc(content.singature)
+            self.writeClassDesc(content.signature)
             self.stream.writeInt(content.length)
             self.handles.append(content)
             for i in content.list:
-                if content.singature.name[1:].startswith("[") or content.singature.name[1:].startswith("L"):
+                if content.signature.name[1:].startswith("[") or content.signature.name[1:].startswith("L"):
                     self.writeContent(i)
                 else:
-                    self.writeJavaField(JavaField(None, content.singature.name[1:], i))
+                    self.writeJavaField(JavaField(None, content.signature.name[1:], i))
 
     def writeJavaException(self, content):
         self.stream.writeBytes(Constants.TC_EXCEPTION)
@@ -222,7 +221,10 @@ def Yaml2JavaObject(yaml):
             for data in value[currentClass.name]:
                 data = data['data']
                 type = Yaml2JavaContent(data['type'])
-                value = Yaml2JavaContent(data['value'])
+                if data['value'] == 'self':
+                    value = javaObject
+                else:
+                    value = Yaml2JavaContent(data['value'])
                 javaField = JavaField(data['fieldName'], type, value)
                 currentField.append(javaField)
         javaObject.fields.append(currentField)
@@ -234,12 +236,22 @@ def Yaml2JavaObject(yaml):
 
 
 def Yaml2JavaClass(yaml):
-    javaClassYaml = yaml['javaClass']
+    try:
+        javaClassYaml = yaml['javaClass']
+    except KeyError:
+        javaClassYaml = yaml
     name = javaClassYaml['name']
     suid = javaClassYaml['suid']
     flags = javaClassYaml['flags']
 
     javaClass = JavaClass(name, suid, flags)
+    externalizable = flags & Constants.SC_EXTERNALIZABLE != 0
+    sflag = flags & Constants.SC_SERIALIZABLE != 0
+    hasWriteObjectData = flags & Constants.SC_WRITE_METHOD != 0
+    hasBlockExternalData = flags & Constants.SC_BLOCK_DATA != 0
+    if externalizable and sflag:
+        print("serializable and externalizable flags conflict")
+    javaClass.hasWriteObjectData = hasWriteObjectData
     if javaClassYaml['superClass'] is not None:
         javaClass.superJavaClass = Yaml2JavaClass(javaClassYaml['superClass'])
     else:
@@ -248,10 +260,10 @@ def Yaml2JavaClass(yaml):
         javaClass.classAnnotations.append(Yaml2JavaContent(i))
     for field in javaClassYaml['fields']:
         fieldMap = dict()
-        if isinstance(field['singature'], dict):
-            fieldMap['singature'] = Yaml2JavaContent(field['singature'])
+        if isinstance(field['signature'], dict):
+            fieldMap['signature'] = Yaml2JavaContent(field['signature'])
         else:
-            fieldMap['singature'] = field['singature']
+            fieldMap['signature'] = field['signature']
         fieldMap['name'] = field['name']
         javaClass.fields.append(fieldMap)
     return javaClass
@@ -262,7 +274,12 @@ def Yaml2JavaEnum(yaml):
 
 
 def Yaml2JavaArray(yaml):
-    pass
+    signature = Yaml2JavaClass(yaml['signature'])
+    length = yaml['length']
+    javaArray = JavaArray(length, signature)
+    for i in yaml['values']:
+        javaArray.add(Yaml2JavaContent(i))
+    return javaArray
 
 
 def Yaml2JavaString(yaml):
@@ -271,7 +288,8 @@ def Yaml2JavaString(yaml):
 
 def Yaml2JavaBLockData(yaml):
     size = yaml['size']
-    data = bytes.fromhex(yaml['data'])
+    # data = bytes.fromhex(yaml['data'])
+    data = yaml['data']
     return JavaBLockData(size, data)
 
 
@@ -288,7 +306,7 @@ def Yaml2JavaContent(yaml):
                 return Yaml2JavaClass(yaml[k])
             elif k == 'JavaEnum':
                 return Yaml2JavaEnum(yaml[k])
-            elif k == 'JavaArray':
+            elif k == 'javaArray':
                 return Yaml2JavaArray(yaml[k])
             elif k == 'javaString':
                 return Yaml2JavaString(yaml[k])
@@ -297,7 +315,7 @@ def Yaml2JavaContent(yaml):
             elif k == 'javaEndBLock':
                 return Yaml2JavaEndBlock(yaml[k])
             else:
-                print(k)
+                print("unpupport ", k)
                 print(yaml[k])
                 return k
     else:
@@ -311,23 +329,24 @@ if __name__ == '__main__':
         a = ObjectStream(f)
         obj = a.readContent()
         # obj1 = copy.deepcopy(obj)
-        # d = javaContent2Yaml(obj)
-        print("------------------------------------")
-        # print(d)
-        print("------------------------------------")
+        d = javaContent2Yaml(obj)
+        # print("------------------------------------")
+        # # print(d)
+        # print("------------------------------------")
         # print(json.dumps(d, indent=2, cls=MyEncoder, ensure_ascii=False))
-        # payload = json.dumps(d, indent=2, cls=MyEncoder, ensure_ascii=False)
-        # print(payload)
+        payload = json.dumps(d, indent=2, cls=MyEncoder, ensure_ascii=False)
+        print(payload)
+        e = Yaml2JavaContent(d)
+        print(e)
+        print(e == obj)
+        # print(payload)e.fields[2][0].value.fields[1][5].value
         # exit()
-    print(obj == obj1)
     with open("test.ser", 'wb') as f:
         o = ObjectWrite(f)
-        o.writeContent(obj)
+        o.writeContent(e)
         pass
     with open("test.ser", 'rb') as f:
         obj1 = ObjectStream(f).readContent()
-        # d = javaContent2Yaml(obj)
-        print(obj == obj1)
 
     # import yaml
     #
