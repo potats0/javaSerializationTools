@@ -244,7 +244,7 @@ def javaObject2Yaml(javaObject):
         allValues.append({className: value})
         for currentObjField in currentObjFields:
             data = {'type': javaContent2Yaml(currentObjField.signature), 'fieldName': currentObjField.fieldName}
-            if currentObjField.value == javaObject:
+            if id(currentObjField.value) == id(javaObject):
                 data['value'] = "self"
             else:
                 data['value'] = javaContent2Yaml(currentObjField.value)

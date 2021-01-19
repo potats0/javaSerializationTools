@@ -204,7 +204,10 @@ class ObjectWrite:
 
 
 def Yaml2JavaObject(yaml):
-    javaClass = Yaml2JavaClass(yaml['classDesc'])
+    try:
+        javaClass = Yaml2JavaProxyClass(yaml['classDesc'])
+    except KeyError:
+        javaClass = Yaml2JavaClass(yaml['classDesc'])
     javaObject = JavaObject(javaClass)
     superClassList = []
     superClass = javaObject.javaClass
@@ -269,6 +272,20 @@ def Yaml2JavaClass(yaml):
     return javaClass
 
 
+def Yaml2JavaProxyClass(yaml):
+    yamlProxyClass = yaml['JavaproxyClass']
+    interfaces = []
+    for i in yamlProxyClass['interfaces']:
+        interfaces.append(i)
+    javaproxyclass = JavaProxyClass(interfaces)
+    if yamlProxyClass['superClass']:
+        superClass = Yaml2JavaClass(yamlProxyClass['superClass'])
+        javaproxyclass.superJavaClass = superClass
+
+    for i in yamlProxyClass['classAnnotations']:
+        javaproxyclass.classAnnotations.append(Yaml2JavaContent(i))
+    return javaproxyclass
+
 def Yaml2JavaEnum(yaml):
     pass
 
@@ -278,7 +295,10 @@ def Yaml2JavaArray(yaml):
     length = yaml['length']
     javaArray = JavaArray(length, signature)
     for i in yaml['values']:
-        javaArray.add(Yaml2JavaContent(i))
+        i = Yaml2JavaContent(i)
+        if signature.name == "[B":
+            i = i.to_bytes(1, 'big')
+        javaArray.add(i)
     return javaArray
 
 
@@ -325,7 +345,7 @@ def Yaml2JavaContent(yaml):
 if __name__ == '__main__':
     payload = ""
     obj1 = ""
-    with open("tests/payload.ser", "rb") as f:
+    with open("tests/BeanShell1.ser", "rb") as f:
         a = ObjectStream(f)
         obj = a.readContent()
         # obj1 = copy.deepcopy(obj)
