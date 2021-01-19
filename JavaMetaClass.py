@@ -27,6 +27,11 @@ class JavaLongBLockData:
         self.size = size
         self.data = data
 
+    def __eq__(self, other):
+        if not isinstance(other, JavaLongBLockData):
+            return False
+        return self.size == other.size and self.data == other.data
+
 
 class JavaClass:
     def __init__(self, name, suid, flags):
@@ -55,10 +60,23 @@ class JavaProxyClass:
         self.hasWriteObjectData = False
         self.name = "Dynamic proxy"
 
+    def __eq__(self, other):
+        if not isinstance(other, JavaProxyClass):
+            return False
+        for i in zip(self.interfaces, other.interfaces):
+            if i[0] != i[1]:
+                return False
+        return self.superJavaClass == other.superJavaClass
+
 
 class JavaException:
     def __init__(self, exception):
         self.exception = exception
+
+    def __eq__(self, other):
+        if not isinstance(other, JavaException):
+            return False
+        return self.exception == other.exception
 
 
 class JavaArray:
@@ -70,11 +88,26 @@ class JavaArray:
     def add(self, __obj__):
         self.list.append(__obj__)
 
+    def __eq__(self, other):
+        if not isinstance(other, JavaArray):
+            return False
+        if self.length != other.length:
+            return False
+        for i in zip(self.list, other.list):
+            if i[0] != i[1]:
+                return False
+        return True
+
 
 class JavaEnum:
     def __init__(self, javaClass):
         self.javaClass = javaClass
         self.enumConstantName = None
+
+    def __eq__(self, other):
+        if not isinstance(other, JavaEnum):
+            return False
+        return other.javaClass == self.javaClass and self.enumConstantName == other.enumConstantName
 
 
 class JavaString:
@@ -106,6 +139,8 @@ class JavaObject:
     def __eq__(self, other):
         if not isinstance(other, JavaObject):
             return False
+        if id(other) == id(self):
+            return True
         if other.javaClass != self.javaClass:
             return False
         if len(other.fields) != len(self.fields):
@@ -113,6 +148,8 @@ class JavaObject:
         else:
             for i in zip(self.fields, other.fields):
                 for j in zip(*i):
+                    if j[0].value == self and j[1].value == other:
+                        continue
                     if j[0] != j[1]:
                         return False
         if len(other.objectAnnotation) != len(self.objectAnnotation):
@@ -122,9 +159,6 @@ class JavaObject:
                 if i[0] != i[1]:
                     return False
         return True
-
-
-
 
 
 class JavaField:
@@ -212,7 +246,8 @@ def javaObject2Yaml(javaObject):
     d['Values'] = allValues
     objectAnnotation = []
     for o in javaObject.objectAnnotation:
-        objectAnnotation.append(javaContent2Yaml(o))
+        a = javaContent2Yaml(o)
+        objectAnnotation.append(a)
     else:
         d['objectAnnotation'] = objectAnnotation
     return {'javaObject': d}
