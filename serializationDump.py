@@ -47,7 +47,9 @@ class ObjectIO:
 
     def readFloat(self):
         num = self.readBytes(4)
-        return unpack('f', num)[0]
+        # 模拟ieee 754 标准，具体参考https://stackoverflow.com/questions/30124608/convert-unsigned-integer-to-float-in-python
+        s = pack('>l', int.from_bytes(num, 'big'))
+        return unpack('>f', s)[0]
 
     def readBoolean(self):
         tc = int.from_bytes(self.readByte(), 'big')
@@ -79,10 +81,12 @@ class ObjectIO:
         self.writeBytes(num.to_bytes(2, "big"))
 
     def writeLong(self, num):
-        self.writeBytes(num.to_bytes(8, "big"))
+        self.writeBytes(num.to_bytes(8, "big", signed=True))
 
     def writeFloat(self, value):
-        self.writeBytes(pack('f', value))
+        s = pack('>f', value)
+        s = unpack('>l', s)[0]
+        self.writeBytes(s.to_bytes(4, 'big'))
 
     def writeChar(self, value):
         self.writeBytes(value.encode)
