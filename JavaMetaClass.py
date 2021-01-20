@@ -1,6 +1,7 @@
 import copy
 from collections import OrderedDict
 
+reference = []
 
 class JavaEndBlock:
     def __eq__(self, other):
@@ -148,18 +149,26 @@ class JavaObject:
         if len(other.fields) != len(self.fields):
             return False
         else:
+            if id(self) in reference:
+                return True
+            else:
+                reference.append(id(self))
             for i in zip(self.fields, other.fields):
                 for j in zip(*i):
                     if j[0].value == self and j[1].value == other:
                         continue
                     if j[0] != j[1]:
+                        reference.pop()
                         return False
         if len(other.objectAnnotation) != len(self.objectAnnotation):
+            reference.pop()
             return False
         else:
             for i in zip(other.objectAnnotation, self.objectAnnotation):
                 if i[0] != i[1]:
+                    reference.pop()
                     return False
+        reference.pop()
         return True
 
 
