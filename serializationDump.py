@@ -359,6 +359,10 @@ class ObjectStream:
             javaObject.objectAnnotation.append(__obj__)
             if isinstance(__obj__, JavaEndBlock):
                 break
+            # 为了读取8u20 gadget
+            if isinstance(__obj__, JavaObject):
+                if __obj__.javaClass.name =='sun.reflect.annotation.AnnotationInvocationHandler' and javaObject.javaClass.name == 'java.beans.beancontext.BeanContextSupport':
+                    break
 
     def readNull(self):
         self.bin.readByte()
