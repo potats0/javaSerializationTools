@@ -70,14 +70,14 @@ class ObjectWrite:
                 superClass = superClass.superJavaClass
             else:
                 break
-        # 防止出现引用的时候，之前的对象字段丢失，导致另外一个引用的对象无法判断handle
-        backupFields = copy.deepcopy(javaObject.fields)
-        for field in backupFields:
+        lastWriteObjectAnnotations = 0
+        for field in javaObject.fields:
             classDesc = superClassList.pop()
             for i in field:
                 self.writeContent(i)
             if classDesc.hasWriteObjectData:
-                self.writeObjectAnnotations(javaObject.objectAnnotation)
+                lastWriteObjectAnnotations = self.writeObjectAnnotations(javaObject.objectAnnotation,
+                                                                         lastWriteObjectAnnotations)
 
     def writeClassDesc(self, javaClass):
         if javaClass in self.handles:
@@ -152,9 +152,16 @@ class ObjectWrite:
         else:
             print("unsupport", content)
 
-    def writeObjectAnnotations(self, objectAnnotation):
-        for i in objectAnnotation:
-            self.writeContent(i)
+    def writeObjectAnnotations(self, objectAnnotation, lastWriteObjectAnnotations):
+        while lastWriteObjectAnnotations < len(objectAnnotation):
+            self.writeContent(objectAnnotation[lastWriteObjectAnnotations])
+            if isinstance(objectAnnotation[lastWriteObjectAnnotations], JavaEndBlock):
+                lastWriteObjectAnnotations += 1
+                break
+            else:
+                lastWriteObjectAnnotations += 1
+
+        return lastWriteObjectAnnotations
         # while len(objectAnnotation):
         #     i = objectAnnotation.pop(0)
         #     self.writeContent(i)
@@ -229,12 +236,12 @@ if __name__ == '__main__':
     payload = ""
     obj1 = ""
 
-    with open("tests/dnslog.ser", "rb") as f:
-        # a = ObjectStream(f)
-        # obj = a.readContent()
-        # dns = open('dns.yaml', 'w+')
-        # yaml.dump(obj, dns, allow_unicode=True)
-        # dns.close()
+    with open("tests/8u20.ser", "rb") as f:
+        a = ObjectStream(f)
+        obj = a.readContent()
+        dns = open('dns.yaml', 'w+')
+        yaml.dump(obj, dns, allow_unicode=True)
+        dns.close()
         dns = open('dns.yaml', 'r')
         ystr = dns.read()
 
