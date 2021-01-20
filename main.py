@@ -4,8 +4,8 @@ import json
 import yaml
 
 from Constants import Constants
-from JavaMetaClass import JavaClass, JavaEndBlock, JavaString, JavaObject, JavaField, JavaBLockData, \
-    JavaArray, JavaException, JavaProxyClass, JavaEnum
+from JavaMetaClass import JavaClassDesc, JavaEndBlock, JavaString, JavaObject, JavaField, JavaBLockData, \
+    JavaArray, JavaException, JavaProxyClass, JavaEnum, JavaClass
 from serializationDump import ObjectStream, ObjectIO
 
 
@@ -41,12 +41,14 @@ class ObjectWrite:
             self.writeJavaArray(content)
         elif isinstance(content, JavaException):
             self.writeJavaException(content)
-        elif isinstance(content, JavaClass):
-            self.writeJavaClass(content)
+        elif isinstance(content, JavaClassDesc):
+            self.writeJavaClassDesc(content)
         elif isinstance(content, JavaProxyClass):
             self.writeJavaProxyClass(content)
         elif isinstance(content, JavaEnum):
             self.writeEnum(content)
+        elif isinstance(content, JavaClass):
+            self.writeClass(content)
         elif content == 'null':
             self.stream.writeBytes(Constants.TC_NULL)
         else:
@@ -184,7 +186,7 @@ class ObjectWrite:
         self.writeContent(content.exception)
         self.handles = []
 
-    def writeJavaClass(self, content):
+    def writeJavaClassDesc(self, content):
         if content in self.handles:
             return self.writeHandle(content)
         else:
@@ -215,6 +217,12 @@ class ObjectWrite:
         self.handles.append(content)
         self.writeContent(content.enumConstantName)
 
+    def writeClass(self, content):
+        if content in self.handles:
+            return self.writeHandle(content)
+        self.stream.writeBytes(Constants.TC_CLASS)
+        self.writeClassDesc(content.javaclassDesc)
+        self.handles.append(content)
 
 def Yaml2JavaObject(yaml):
     try:
@@ -260,7 +268,7 @@ def Yaml2JavaClass(yaml):
     suid = javaClassYaml['suid']
     flags = javaClassYaml['flags']
 
-    javaClass = JavaClass(name, suid, flags)
+    javaClass = JavaClassDesc(name, suid, flags)
     externalizable = flags & Constants.SC_EXTERNALIZABLE != 0
     sflag = flags & Constants.SC_SERIALIZABLE != 0
     hasWriteObjectData = flags & Constants.SC_WRITE_METHOD != 0
@@ -360,17 +368,16 @@ if __name__ == '__main__':
     payload = ""
     obj1 = ""
 
-    with open("tests/CommonsCollections1.ser", "rb") as f:
-        a = ObjectStream(f)
-        obj = a.readContent()
-        dns = open('dns.yaml', 'w+')
-        yaml.dump(obj, dns, allow_unicode=True)
-        dns.close()
+    with open("tests/dnslog.ser", "rb") as f:
+        # a = ObjectStream(f)
+        # obj = a.readContent()
+        # dns = open('dns.yaml', 'w+')
+        # yaml.dump(obj, dns, allow_unicode=True)
+        # dns.close()
         dns = open('dns.yaml', 'r')
         ystr = dns.read()
 
         aa = yaml.load(ystr, Loader=yaml.FullLoader)
-        print(aa == obj)
         # exit(-2)
         # d = javaContent2Yaml(obj)
         # print("------------------------------------")

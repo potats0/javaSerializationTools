@@ -3,6 +3,7 @@ from collections import OrderedDict
 
 reference = []
 
+
 class JavaEndBlock:
     def __eq__(self, other):
         return isinstance(other, JavaEndBlock)
@@ -35,7 +36,7 @@ class JavaLongBLockData:
         return self.size == other.size and self.data == other.data
 
 
-class JavaClass:
+class JavaClassDesc:
     def __init__(self, name, suid, flags):
         self.name = name
         self.suid = suid
@@ -46,12 +47,22 @@ class JavaClass:
         self.hasWriteObjectData = False
 
     def __eq__(self, other):
-        if not isinstance(other, JavaClass):
+        if not isinstance(other, JavaClassDesc):
             return False
         return other.name == self.name
 
     def __str__(self):
         return f"javaclass {self.name}"
+
+
+class JavaClass:
+    def __init__(self, javaclassDesc):
+        self.javaclassDesc = javaclassDesc
+
+    def __eq__(self, other):
+        if not isinstance(other, JavaClass):
+            return False
+        return self.javaclassDesc == other.javaclassDesc
 
 
 class JavaProxyClass:
@@ -215,7 +226,7 @@ def javaEnum2Yaml(javaEnum):
 
 def javaArray2Yaml(javaArray):
     d = dict()
-    if isinstance(javaArray.signature, JavaClass):
+    if isinstance(javaArray.signature, JavaClassDesc):
         d['signature'] = javaClass2Yaml(javaArray.signature)
     else:
         d['signature'] = javaArray.javaClass
@@ -304,7 +315,7 @@ def javaEndBLock2Yaml(JavaEndBLock):
 def javaContent2Yaml(java):
     if isinstance(java, JavaObject):
         return javaObject2Yaml(java)
-    elif isinstance(java, JavaClass):
+    elif isinstance(java, JavaClassDesc):
         return javaClass2Yaml(java)
     elif isinstance(java, JavaEnum):
         return javaEnum2Yaml(java)

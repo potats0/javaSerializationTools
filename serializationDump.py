@@ -173,7 +173,7 @@ class ObjectStream:
         print(f"className {className}")
         print(f"suid {suid}")
         print(f"number of fields {numFields}")
-        classDesc = JavaClass(className, suid, flags)
+        classDesc = JavaClassDesc(className, suid, flags)
         classDesc.hasWriteObjectData = hasWriteObjectData
         classDesc.hasBlockExternalData = hasBlockExternalData
         handle = self.newHandles(classDesc)
@@ -310,9 +310,10 @@ class ObjectStream:
         elif tc == Constants.TC_CLASS:
             self.bin.readByte()
             clazz = self.readClassDescriptor()
-            handle = self.newHandles(clazz)
+            javaClass = JavaClass(clazz)
+            handle = self.newHandles(javaClass)
             print(f"TC_CLASS new handle from {hex(handle)}")
-            return clazz
+            return javaClass
         elif tc == Constants.TC_CLASSDESC:
             return self.readClassDescriptor()
         elif tc == Constants.TC_PROXYCLASSDESC:
