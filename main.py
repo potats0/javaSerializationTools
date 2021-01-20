@@ -1,10 +1,11 @@
 import copy
 import json
-from collections import OrderedDict
+
+import yaml
 
 from Constants import Constants
-from JavaMetaClass import javaContent2Yaml, JavaClass, JavaEndBlock, JavaString, JavaObject, JavaField, JavaBLockData, \
-    JavaArray, JavaException, JavaProxyClass
+from JavaMetaClass import JavaClass, JavaEndBlock, JavaString, JavaObject, JavaField, JavaBLockData, \
+    JavaArray, JavaException, JavaProxyClass, JavaEnum
 from serializationDump import ObjectStream, ObjectIO
 
 
@@ -44,6 +45,8 @@ class ObjectWrite:
             self.writeJavaClass(content)
         elif isinstance(content, JavaProxyClass):
             self.writeJavaProxyClass(content)
+        elif isinstance(content, JavaEnum):
+            self.writeEnum(content)
         elif content == 'null':
             self.stream.writeBytes(Constants.TC_NULL)
         else:
@@ -148,11 +151,13 @@ class ObjectWrite:
             print("unsupport", content)
 
     def writeObjectAnnotations(self, objectAnnotation):
-        while len(objectAnnotation):
-            i = objectAnnotation.pop(0)
+        for i in objectAnnotation:
             self.writeContent(i)
-            if i == JavaEndBlock:
-                return
+        # while len(objectAnnotation):
+        #     i = objectAnnotation.pop(0)
+        #     self.writeContent(i)
+        #     if i == JavaEndBlock:
+        #         return
 
     def writeJavaBlockData(self, content):
         self.stream.writeBytes(Constants.TC_BLOCKDATA)
@@ -201,6 +206,14 @@ class ObjectWrite:
             self.writeClassDesc(content.superJavaClass)
         else:
             self.stream.writeBytes(Constants.TC_NULL)
+
+    def writeEnum(self, content):
+        if content in self.handles:
+            return self.writeHandle(content)
+        self.stream.writeBytes(Constants.TC_ENUM)
+        self.writeClassDesc(content.javaClass)
+        self.handles.append(content)
+        self.writeContent(content.enumConstantName)
 
 
 def Yaml2JavaObject(yaml):
@@ -286,6 +299,7 @@ def Yaml2JavaProxyClass(yaml):
         javaproxyclass.classAnnotations.append(Yaml2JavaContent(i))
     return javaproxyclass
 
+
 def Yaml2JavaEnum(yaml):
     pass
 
@@ -345,29 +359,38 @@ def Yaml2JavaContent(yaml):
 if __name__ == '__main__':
     payload = ""
     obj1 = ""
-    with open("tests/BeanShell1.ser", "rb") as f:
+
+    with open("tests/CommonsCollections1.ser", "rb") as f:
         a = ObjectStream(f)
         obj = a.readContent()
-        # obj1 = copy.deepcopy(obj)
-        d = javaContent2Yaml(obj)
+        dns = open('dns.yaml', 'w+')
+        yaml.dump(obj, dns, allow_unicode=True)
+        dns.close()
+        dns = open('dns.yaml', 'r')
+        ystr = dns.read()
+
+        aa = yaml.load(ystr, Loader=yaml.FullLoader)
+        print(aa == obj)
+        # exit(-2)
+        # d = javaContent2Yaml(obj)
         # print("------------------------------------")
         # # print(d)
         # print("------------------------------------")
         # print(json.dumps(d, indent=2, cls=MyEncoder, ensure_ascii=False))
-        payload = json.dumps(d, indent=2, cls=MyEncoder, ensure_ascii=False)
-        print(payload)
-        e = Yaml2JavaContent(d)
-        print(e)
-        print(e == obj)
+        # payload = json.dumps(d, indent=2, cls=MyEncoder, ensure_ascii=False)
+        # print(payload)
+        # e = Yaml2JavaContent(d)
+        # print(e)
+        # print(e == obj)
         # print(payload)e.fields[2][0].value.fields[1][5].value
         # exit()
     with open("test.ser", 'wb') as f:
         o = ObjectWrite(f)
-        o.writeContent(e)
+        o.writeContent(aa)
         pass
     with open("test.ser", 'rb') as f:
         obj1 = ObjectStream(f).readContent()
-
+        print(obj1 == aa)
     # import yaml
     #
     # f = open('dns.yaml', 'w+')
