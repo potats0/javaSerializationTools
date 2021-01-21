@@ -1,0 +1,92 @@
+!!python/object:javaSerializationTools.JavaMetaClass.JavaObject
+fields:
+- - !!python/object:javaSerializationTools.JavaMetaClass.JavaField
+    fieldName: loadFactor
+    signature: F
+    value: 0.75
+  - !!python/object:javaSerializationTools.JavaMetaClass.JavaField
+    fieldName: threshold
+    signature: I
+    value: 12
+javaClass: !!python/object:javaSerializationTools.JavaMetaClass.JavaClassDesc
+  classAnnotations:
+  - !!python/object:javaSerializationTools.JavaMetaClass.JavaEndBlock {}
+  fields:
+  - name: loadFactor
+    signature: F
+  - name: threshold
+    signature: I
+  flags: 3
+  hasBlockExternalData: false
+  hasWriteObjectData: true
+  name: java.util.HashMap
+  suid: 362498820763181265
+  superJavaClass: null
+objectAnnotation:
+- !!python/object:javaSerializationTools.JavaMetaClass.JavaBLockData
+  data: !!binary |
+    AAAAEAAAAAE=
+  size: 8
+- !!python/object:javaSerializationTools.JavaMetaClass.JavaObject
+  fields:
+  - - !!python/object:javaSerializationTools.JavaMetaClass.JavaField
+      fieldName: hashCode
+      signature: I
+      value: -1
+    - !!python/object:javaSerializationTools.JavaMetaClass.JavaField
+      fieldName: port
+      signature: I
+      value: -1
+    - !!python/object:javaSerializationTools.JavaMetaClass.JavaField
+      fieldName: authority
+      signature: &id001 !!python/object:javaSerializationTools.JavaMetaClass.JavaString
+        string: Ljava/lang/String;
+      value: &id002 !!python/object:javaSerializationTools.JavaMetaClass.JavaString
+        string: www.baidu.com
+    - !!python/object:javaSerializationTools.JavaMetaClass.JavaField
+      fieldName: file
+      signature: *id001
+      value: !!python/object:javaSerializationTools.JavaMetaClass.JavaString
+        string: ''
+    - !!python/object:javaSerializationTools.JavaMetaClass.JavaField
+      fieldName: host
+      signature: *id001
+      value: *id002
+    - !!python/object:javaSerializationTools.JavaMetaClass.JavaField
+      fieldName: protocol
+      signature: *id001
+      value: !!python/object:javaSerializationTools.JavaMetaClass.JavaString
+        string: http
+    - !!python/object:javaSerializationTools.JavaMetaClass.JavaField
+      fieldName: ref
+      signature: *id001
+      value: 'null'
+  javaClass: !!python/object:javaSerializationTools.JavaMetaClass.JavaClassDesc
+    classAnnotations:
+    - !!python/object:javaSerializationTools.JavaMetaClass.JavaEndBlock {}
+    fields:
+    - name: hashCode
+      signature: I
+    - name: port
+      signature: I
+    - name: authority
+      signature: *id001
+    - name: file
+      signature: *id001
+    - name: host
+      signature: *id001
+    - name: protocol
+      signature: *id001
+    - name: ref
+      signature: *id001
+    flags: 3
+    hasBlockExternalData: false
+    hasWriteObjectData: true
+    name: java.net.URL
+    suid: -7627629688361524110
+    superJavaClass: null
+  objectAnnotation:
+  - !!python/object:javaSerializationTools.JavaMetaClass.JavaEndBlock {}
+- !!python/object:javaSerializationTools.JavaMetaClass.JavaString
+  string: http://www.baidu.com
+- !!python/object:javaSerializationTools.JavaMetaClass.JavaEndBlock {}
