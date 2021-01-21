@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 class Constants:
     magic = 44269  # 0xaced
     version = 5  # 0005

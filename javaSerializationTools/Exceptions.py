@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 class InvalidHeaderException(Exception):
     def __init__(self, magic, version):
         self.magic = magic
