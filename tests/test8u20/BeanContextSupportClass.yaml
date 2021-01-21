@@ -1,6 +1,6 @@
-!!python/object:JavaMetaClass.JavaClassDesc
+!!python/object:javaSerializationTools.JavaMetaClass.JavaClassDesc
 classAnnotations:
-- !!python/object:JavaMetaClass.JavaEndBlock {}
+- !!python/object:javaSerializationTools.JavaMetaClass.JavaEndBlock {}
 fields:
 - name: serializable
   signature: I
@@ -9,12 +9,12 @@ hasBlockExternalData: false
 hasWriteObjectData: true
 name: java.beans.beancontext.BeanContextSupport
 suid: -4879613978649577204
-superJavaClass: !!python/object:JavaMetaClass.JavaClassDesc
+superJavaClass: !!python/object:javaSerializationTools.JavaMetaClass.JavaClassDesc
   classAnnotations:
-  - !!python/object:JavaMetaClass.JavaEndBlock {}
+  - !!python/object:javaSerializationTools.JavaMetaClass.JavaEndBlock {}
   fields:
   - name: beanContextChildPeer
-    signature: !!python/object:JavaMetaClass.JavaString
+    signature: !!python/object:javaSerializationTools.JavaMetaClass.JavaString
       string: Ljava/beans/beancontext/BeanContextChild;
   flags: 3
   hasBlockExternalData: false
