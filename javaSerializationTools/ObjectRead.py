@@ -6,7 +6,7 @@ from .JavaMetaClass import JavaProxyClass, JavaClassDesc, JavaEndBlock, JavaObje
 from .ObjectIO import ObjectIO
 
 
-class ObjectStream:
+class ObjectRead:
     def __init__(self, stream):
         self.bin = ObjectIO(stream)
         self.handles = []
